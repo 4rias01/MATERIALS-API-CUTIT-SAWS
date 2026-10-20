@@ -1,0 +1,183 @@
+# Pipeline de la célula Materiales y Fórmulas (DAS, restricción "Integración y despliegue continuos").
+#
+# Pull Request hacia main ......... build + pruebas + análisis SonarCloud con quality gate.
+# Push a main (PR aprobado y fusionado)
+#   1. integracion ................ build + pruebas + SonarCloud; falla si no se aprueba el quality gate.
+#   2. imagen ..................... construye la imagen Docker y la publica en GHCR.
+#   3. despliegue ................. copia docker-compose.yml y monitoring/ a la EC2 por SSH,
+#                                   descarga la imagen y reinicia los contenedores.
+#
+# Secretos (Settings > Secrets and variables > Actions):
+#   SONAR_TOKEN     token del proyecto en SonarCloud
+#   EC2_HOST        IP o DNS público de la EC2
+#   EC2_USUARIO     usuario SSH de la EC2 (por ejemplo, ubuntu o ec2-user)
+#   EC2_LLAVE_SSH   llave privada SSH (contenido del archivo .pem)
+# Variable opcional: EC2_DIRECTORIO (carpeta del despliegue en la EC2; por defecto materiales-formulas).
+
+name: CI/CD
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  NOMBRE_IMAGEN: materiales-formulas-api
+
+jobs:
+  integracion:
+    name: Build, pruebas y SonarCloud
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: materiales_formulas_test
+          POSTGRES_USER: materiales
+          POSTGRES_PASSWORD: materiales
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U materiales -d materiales_formulas_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql+asyncpg://materiales:materiales@localhost:5432/materiales_formulas_test
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0 # SonarCloud usa el historial para asignar cada problema a su cambio
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements*.txt
+
+      - name: Build
+        run: |
+          pip install -r requirements-dev.txt
+          python -m compileall -q app migrations
+
+      - name: Pruebas unitarias y de integración (con cobertura)
+        run: pytest --cov --cov-report=xml --cov-report=term --junitxml=reporte-pruebas.xml
+
+      - name: Análisis estático y quality gate (SonarCloud)
+        uses: SonarSource/sonarqube-scan-action@v8
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        # sonar-project.properties tiene sonar.qualitygate.wait=true: si el quality gate no
+        # se aprueba, este paso falla y no se publica ni se despliega la imagen.
+
+  imagen:
+    name: Publicar imagen en GHCR
+    needs: integracion
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      imagen: ${{ steps.nombre.outputs.imagen }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Nombre de la imagen (GHCR exige minúsculas)
+        id: nombre
+        run: echo "imagen=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/${NOMBRE_IMAGEN}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ steps.nombre.outputs.imagen }}:${{ github.sha }}
+            ${{ steps.nombre.outputs.imagen }}:latest
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.title=${{ env.NOMBRE_IMAGEN }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  despliegue:
+    name: Desplegar en AWS EC2
+    needs: imagen
+    runs-on: ubuntu-latest
+    environment: produccion
+    concurrency:
+      group: despliegue-produccion
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      packages: read
+    env:
+      EC2_HOST: ${{ secrets.EC2_HOST }}
+      EC2_USUARIO: ${{ secrets.EC2_USUARIO }}
+      DIRECTORIO: ${{ vars.EC2_DIRECTORIO || 'materiales-formulas' }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Configurar SSH
+        env:
+          EC2_LLAVE_SSH: ${{ secrets.EC2_LLAVE_SSH }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$EC2_LLAVE_SSH" > ~/.ssh/ec2
+          chmod 600 ~/.ssh/ec2
+          ssh-keyscan -H "$EC2_HOST" >> ~/.ssh/known_hosts
+
+      - name: Copiar docker-compose.yml y monitoring/
+        run: |
+          ssh -i ~/.ssh/ec2 "$EC2_USUARIO@$EC2_HOST" "mkdir -p '$DIRECTORIO'"
+          scp -i ~/.ssh/ec2 -r docker-compose.yml monitoring "$EC2_USUARIO@$EC2_HOST:$DIRECTORIO/"
+
+      - name: Descargar la imagen y reiniciar los contenedores
+        env:
+          IMAGEN: ${{ needs.imagen.outputs.imagen }}
+          TAG: ${{ github.sha }}
+          GHCR_USUARIO: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # El token de GHCR viaja por la entrada estándar (no queda en la línea de comandos).
+          printf '%s' "$GHCR_TOKEN" | ssh -i ~/.ssh/ec2 "$EC2_USUARIO@$EC2_HOST" \
+            "docker login ghcr.io -u '$GHCR_USUARIO' --password-stdin"
+          ssh -i ~/.ssh/ec2 "$EC2_USUARIO@$EC2_HOST" bash -s -- "$DIRECTORIO" "$IMAGEN" "$TAG" <<'EOF'
+          set -euo pipefail
+          cd "$1"
+          test -f .env || { echo "Falta el archivo .env en $1 (ver .env.example)"; exit 1; }
+          export API_IMAGEN="$2" API_TAG="$3"
+          docker compose pull api
+          docker compose up -d --remove-orphans
+          docker logout ghcr.io
+          docker image prune -f
+          EOF
+
+      - name: Verificar /health
+        run: |
+          ssh -i ~/.ssh/ec2 "$EC2_USUARIO@$EC2_HOST" bash -s <<'EOF'
+          for intento in $(seq 1 30); do
+            if curl -fsS http://localhost:8000/health; then exit 0; fi
+            sleep 5
+          done
+          echo "La API no respondió 200 en /health"
+          exit 1
+          EOF

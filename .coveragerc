@@ -1,0 +1,12 @@
+[run]
+source = app
+branch = True
+relative_files = True
+
+[report]
+skip_empty = True
+show_missing = True
+exclude_lines =
+    pragma: no cover
+    if TYPE_CHECKING:
+    raise NoImplementadoError

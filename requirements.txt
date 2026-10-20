@@ -1,0 +1,12 @@
+# Dependencias de ejecución (versiones fijas para builds reproducibles).
+fastapi==0.156.1
+starlette==1.9.0
+pydantic==2.14.1
+pydantic-settings==2.16.1
+sqlalchemy[asyncio]==2.1.5
+asyncpg==0.32.0
+alembic==1.20.0
+httpx==0.28.1
+prometheus-client==0.26.0
+prometheus-fastapi-instrumentator==8.1.0
+uvicorn[standard]==0.54.0

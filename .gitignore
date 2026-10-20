@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Pruebas y cobertura
+.pytest_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+reporte-pruebas.xml
+
+# Configuración local (contiene claves)
+.env
+
+# Editores y sistema
+.idea/
+.vscode/
+.DS_Store

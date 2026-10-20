@@ -1,0 +1,126 @@
+# Despliegue de la célula Materiales y Fórmulas en su EC2 (vista de despliegue del DAS).
+# Cada proceso corre en su propio contenedor, en la red interna "interna":
+#   api (8000) · postgres (solo red interna) · prometheus (9090, solo localhost)
+#   grafana (3000) · node-exporter (9100, solo red interna)
+#
+# El pipeline copia este archivo y la carpeta monitoring/ a la EC2. Las variables se
+# leen del archivo .env que se crea una sola vez en la EC2 (ver .env.example).
+# En desarrollo, docker-compose.override.yml se aplica automáticamente.
+name: materiales-formulas
+
+services:
+  api:
+    image: ${API_IMAGEN:-materiales-formulas-api}:${API_TAG:-latest}
+    container_name: materiales-api
+    env_file: .env
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+    networks: [interna]
+
+  postgres:
+    image: postgres:16
+    container_name: materiales-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-materiales_formulas}
+      POSTGRES_USER: ${POSTGRES_USER:-materiales}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD en el archivo .env}
+    # Sin "ports": solo la API la alcanza, por la red interna de Docker.
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+    networks: [interna]
+
+  prometheus:
+    image: prom/prometheus:v3.13.4
+    container_name: materiales-prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=15d
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    # Solo desde la propia EC2 (túnel SSH); Grafana lo consulta por la red interna.
+    ports:
+      - "127.0.0.1:9090:9090"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+    networks: [interna]
+
+  grafana:
+    image: grafana/grafana:13.1.0
+    container_name: materiales-grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Defina GRAFANA_ADMIN_PASSWORD en el archivo .env}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/etc/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+    networks: [interna]
+
+  # Métricas de CPU, memoria y disco del servidor (propuesto en el DAS).
+  node-exporter:
+    image: prom/node-exporter:v1.12.1
+    container_name: materiales-node-exporter
+    command:
+      - --path.procfs=/host/proc
+      - --path.sysfs=/host/sys
+      - --path.rootfs=/rootfs
+      - --collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro,rslave
+    pid: host
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.2"
+          memory: 64M
+    networks: [interna]
+
+volumes:
+  pgdata:
+  prometheus-data:
+  grafana-data:
+
+networks:
+  interna:

@@ -1,0 +1,19 @@
+# Solo entran a la imagen: requirements.txt, alembic.ini, migrations/, app/ y docker/entrypoint.sh
+.git
+.github
+.venv
+venv
+.env
+.env.*
+tests
+monitoring
+docs
+**/__pycache__
+**/*.py[cod]
+.pytest_cache
+.coverage
+coverage.xml
+reporte-pruebas.xml
+htmlcov
+docker-compose*.yml
+README.md

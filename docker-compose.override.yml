@@ -1,0 +1,14 @@
+# Solo para desarrollo local: "docker compose up --build" combina este archivo con
+# docker-compose.yml. Construye la imagen desde el código y publica PostgreSQL en
+# localhost para usarlo desde el IDE o las pruebas de integración.
+# El pipeline no copia este archivo a la EC2.
+services:
+  api:
+    image: materiales-formulas-api:local
+    build: .
+    environment:
+      ENTORNO: desarrollo
+
+  postgres:
+    ports:
+      - "127.0.0.1:5432:5432"
