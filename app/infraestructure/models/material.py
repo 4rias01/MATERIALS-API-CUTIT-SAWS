@@ -15,7 +15,7 @@ ESTADOS_MATERIAL = ("ACTIVO", "INACTIVO")
 
 
 class Material(Base):
-    """Material del catálogo. El estado INACTIVO es el borrado lógico (HU-04)."""
+    """Material del catálogo (HU-01)."""
 
     __tablename__ = "material"
 
@@ -42,5 +42,5 @@ class Material(Base):
         return f"<Material {self.id_material} {self.nombre!r} {self.estado}>"
 
 
-# Nombre único sin distinguir mayúsculas de minúsculas (HU-01 c3, HU-03 c3).
+# Nombre único sin distinguir mayúsculas de minúsculas (HU-01 c3).
 Index("uq_material_nombre_lower", func.lower(Material.nombre), unique=True)

@@ -2,8 +2,8 @@
 
 El middleware de traceId guarda aquí el identificador de la petición y el servicio
 de origen. Cualquier capa puede leerlos sin recibirlos por parámetro: el logging los
-agrega a cada línea, la auditoría los persiste y los clientes HTTP los propagan a
-Inventario y a Patent Sweep.
+agrega a cada línea, la auditoría los persiste y el cliente HTTP los propaga a
+Inventario.
 """
 
 import re

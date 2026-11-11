@@ -1,13 +1,10 @@
 """Cliente de la API de Inventario (célula 4).
 
-El backlog fija las rutas (POST /inventario/materias-primas y PATCH
-/inventario/articulos/{codigo}) y qué datos se envían, pero no los nombres de los
-campos JSON ni el código HTTP con que Inventario rechaza un nombre repetido. Esos
-valores están en las constantes POR ACORDAR de abajo y deben confirmarse con la
-célula de Inventario.
+El backlog fija la ruta (POST /inventario/materias-primas, HU-01 c4) y qué datos se
+envían, pero no los nombres de los campos JSON ni el código HTTP con que Inventario
+rechaza un nombre repetido. Esos valores están en las constantes POR ACORDAR de abajo y
+deben confirmarse con la célula de Inventario.
 """
-
-from urllib.parse import quote
 
 import httpx
 
@@ -25,7 +22,6 @@ CAMPO_CODIGO_ARTICULO = "codigo"  # en la respuesta del alta: el Código de art�
 CAMPO_MENSAJE = "mensaje"  # en las respuestas de error
 ESTADO_NOMBRE_DUPLICADO = 409  # "Ya existe un artículo con el nombre [Nombre]" (HU-01 c5)
 ESTADOS_ALTA_EXITOSA = (200, 201)
-ESTADOS_MODIFICACION_EXITOSA = (200, 204)
 # ----------------------------------------------------------------------------------------
 
 
@@ -40,7 +36,6 @@ class InventarioClient(ClienteHttpBase, IInventarioClient):
             nombre_origen=config.nombre_servicio,
         )
         self._ruta_materias_primas = config.inventario_ruta_materias_primas
-        self._ruta_articulo = config.inventario_ruta_articulo
 
     async def registrar_materia_prima(self, nombre: str, unidad_medida: str) -> str:
         respuesta = await self._enviar(
@@ -56,14 +51,3 @@ class InventarioClient(ClienteHttpBase, IInventarioClient):
         if not isinstance(codigo, str) or not codigo:
             raise self._respuesta_inesperada(respuesta)
         return codigo
-
-    async def modificar_nombre_articulo(self, codigo: str, nombre: str) -> None:
-        respuesta = await self._enviar(
-            "PATCH",
-            self._ruta_articulo.format(codigo=quote(codigo, safe="")),
-            json={CAMPO_NOMBRE: nombre},
-        )
-        if respuesta.status_code == ESTADO_NOMBRE_DUPLICADO:
-            raise NombreDuplicadoEnInventarioError(self._json(respuesta).get(CAMPO_MENSAJE))
-        if respuesta.status_code not in ESTADOS_MODIFICACION_EXITOSA:
-            raise self._respuesta_inesperada(respuesta)

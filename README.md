@@ -1,22 +1,23 @@
 # API Materiales y Fórmulas · Cutit Saws Ltd.
 
 API REST de la célula 1 de la plataforma backend de Cutit Saws (Desarrollo de Software II, 2026-2).
-Implementa el **DAS v1.2** del módulo y el **product backlog V1.3** (HU-01 a HU-11).
+Implementa el **DAS v1.2** del módulo y el **product backlog V1.3**.
 
-> **Estado:** base lista para la fase de codificación. La infraestructura transversal
-> funciona y está probada; cada historia de usuario tiene su ruta, su DTO, su servicio y sus
-> pruebas pendientes, y responde **501** hasta que se implemente.
+> **Estado (sprint 0):** la infraestructura transversal funciona y está probada, y hay **un
+> solo flujo implementado de punta a punta como ejemplo: HU-01, registrar material**
+> (`POST /materiales`). Las demás historias se agregan en los siguientes sprints siguiendo
+> ese mismo flujo (sección 4).
 
-| Funciona hoy | Pendiente (por HU) |
+| Funciona hoy | Pendiente |
 |---|---|
-| Arquitectura en capas, inyección de dependencias, configuración por variables de entorno | Lógica de cada servicio (`raise NoImplementadoError`) con sus pasos documentados en `TODO(HU-XX)` |
-| Modelos ORM del MER, migración Alembic, repositorios con paginación y filtros en SQL | Mapeo de cada error de validación a su mensaje del backlog en los DTO (`TODO(HU-XX)`) |
-| Unidad de trabajo (commit/rollback, timeout de 5 s), auditoría, eventos de dominio | 83 pruebas de criterios de aceptación en `tests/hu` (con `skip`) |
-| Clientes de Inventario y Patent Sweep (timeout de 5 s, circuit breaker, traceId) | Contratos POR ACORDAR con Inventario y Patent Sweep |
+| Arquitectura en capas, inyección de dependencias, configuración por variables de entorno | HU-02 a HU-11 (rutas, DTO, servicios, tablas y pruebas) |
+| HU-01 completa: DTO con los mensajes del criterio 2, servicio, repositorio y alta en Inventario | Contrato POR ACORDAR con Inventario (sección 11) |
+| Modelo ORM de `material` y `auditoria`, migración Alembic | |
+| Unidad de trabajo (commit/rollback, timeout de 5 s), auditoría, eventos de dominio | |
+| Cliente de Inventario (timeout de 5 s, circuit breaker, traceId) | |
 | traceId, logs JSON, manejador global de errores, `/health`, `/metrics`, Swagger | |
-| Dominio: objetos de valor, especificaciones, estados de la fórmula, 96 mensajes del backlog | |
 | Dockerfile, Docker Compose, Prometheus, Grafana, node-exporter, GitHub Actions, SonarCloud | |
-| 194 pruebas unitarias y de integración (incluida una que vigila la regla de capas) | |
+| Pruebas unitarias, de integración y de aceptación de HU-01 (`tests/hu`) | |
 
 ---
 
@@ -32,30 +33,29 @@ app/
 │   ├── exceptions.py           Errores para el cliente (con código HTTP) y fallos técnicos
 │   ├── events.py               Bus de eventos de dominio (Observer)
 │   ├── metrics.py              Métricas de Prometheus y /metrics
-│   ├── paginacion.py           Página de resultados (LIMIT/OFFSET)
 │   └── openapi.py              Documentación del contrato (/docs)
-├── presentation/               Capa de presentación (API REST)
-│   ├── routers/                materiales.py · formulas.py · evaluacion_patente.py · health.py
+├── api/                        Capa de presentación (API REST)
+│   ├── routers/                materiales.py · health.py
 │   ├── schemas/                DTO de Pydantic (contratos de entrada y salida, camelCase)
 │   ├── middleware.py           traceId por petición (Correlation ID)
 │   ├── exception_handlers.py   Manejador global de excepciones
 │   └── dependencies.py         Inyección de dependencias (raíz de composición)
 ├── business/                   Capa de lógica de negocio
-│   ├── services/               MaterialService · FormulaService · EvaluacionPatenteService (casos de uso)
-│   └── domain/                 enums · value_objects · specifications · formula_states · mensajes
-└── data_access/                Capa de acceso a datos
-    ├── interfaces/             Contratos que usan los servicios (repositorios, clientes, unidad de trabajo)
+│   ├── services/               MaterialService (casos de uso) · base.py (transacción, auditoría, errores)
+│   └── domain/                 enums · value_objects · errores · eventos · mensajes
+└── infraestructure/            Capa de acceso a datos
+    ├── interfaces/             Contratos que usan los servicios (repositorios, cliente, unidad de trabajo)
     ├── repositories/           Implementaciones con SQLAlchemy
-    ├── models/                 Modelos ORM (tablas del MER)
-    ├── clients/                Clientes HTTP de Inventario y Patent Sweep + circuit breaker
+    ├── models/                 Modelos ORM (material y auditoria)
+    ├── clients/                Cliente HTTP de Inventario + circuit breaker
     ├── unit_of_work.py         Transacción: commit / rollback
     └── database.py             Motor, pool de conexiones y timeouts
 migrations/                     Migraciones versionadas (Alembic)
 tests/
 ├── unit/                       Sin base de datos ni APIs externas
 ├── integration/                Contra PostgreSQL (TEST_DATABASE_URL)
-├── hu/                         Una prueba por criterio de aceptación (pendientes)
-├── dobles/                     Repositorios y clientes en memoria (Test Double)
+├── hu/                         Una o más pruebas por criterio de aceptación (hoy, HU-01)
+├── dobles/                     Repositorios y cliente en memoria (Test Double)
 └── fabricas.py                 Objetos de prueba con valores válidos
 monitoring/                     prometheus.yml y aprovisionamiento + tablero de Grafana
 .github/workflows/ci.yml        Integración continua (develop): ruff, mypy, import-linter, pruebas, SonarCloud
@@ -63,11 +63,11 @@ monitoring/                     prometheus.yml y aprovisionamiento + tablero de 
 pyproject.toml                  Configuración de ruff, mypy e import-linter
 ```
 
-**Regla de dependencias** (la verifica `tests/unit/test_arquitectura.py`):
-`presentation → business → data_access`, y todas pueden usar `core`. Ninguna capa importa de
-una capa superior. Los servicios no importan FastAPI, Pydantic, SQLAlchemy ni httpx: reciben
-interfaces. Solo `app/main.py` y `app/presentation/dependencies.py` conocen las clases
-concretas, porque arman los objetos que se inyectan.
+**Regla de dependencias** (la verifican `lint-imports` y `tests/unit/test_arquitectura.py`):
+`api → business → infraestructure`, y todas pueden usar `core`. Ninguna capa importa de una
+capa superior. Los servicios no importan FastAPI, Pydantic, SQLAlchemy ni httpx: reciben
+interfaces. Solo `app/main.py` y `app/api/dependencies.py` conocen las clases concretas,
+porque arman los objetos que se inyectan.
 
 ---
 
@@ -128,36 +128,53 @@ docker compose exec postgres sh -c 'createdb -U "$POSTGRES_USER" materiales_form
 
 ## 4. Cómo implementar una historia de usuario
 
-Ejemplo con HU-04 (inhabilitar material); el resto sigue el mismo camino.
+HU-01 es el ejemplo de referencia: cada historia nueva recorre los mismos archivos.
 
-1. **Leer el `TODO(HU-04)`** del servicio (`app/business/services/material_service.py`). Tiene
-   los pasos en el orden del backlog, el criterio de cada uno y la constante del mensaje.
-2. **Validación de entrada** (si la HU tiene cuerpo o parámetros): completar `mensajes_error`
-   y los validadores del DTO según su `TODO`. Cada error de validación debe terminar en el
-   mensaje literal del backlog (`app/business/domain/mensajes.py`); el manejador global responde
-   400 con ese texto y el traceId.
-3. **Servicio**: reemplazar `raise NoImplementadoError("HU-04")` por la lógica. Patrón general:
+| Paso | HU-01 (ejemplo) |
+|---|---|
+| 1. Mensajes literales del backlog | `app/business/domain/mensajes.py` (`HU01_*`) |
+| 2. Reglas del dominio (objetos de valor, enums) | `NombreMaterial`, `Densidad`, `Pureza`, `Sku` en `value_objects.py` |
+| 3. Tabla y migración (si hace falta) | `models/material.py` + `alembic revision --autogenerate` |
+| 4. Contrato del repositorio y su implementación | `interfaces/material_repository.py`, `repositories/material_repository.py` |
+| 5. Comando de entrada del caso de uso | `RegistrarMaterialComando` en `services/comandos.py` |
+| 6. Servicio | `MaterialService.registrar` en `services/material_service.py` |
+| 7. DTO de entrada y salida | `MaterialCrearSolicitud` / `MaterialRespuesta` en `api/schemas/materiales.py` |
+| 8. Ruta | `api/routers/materiales.py` (y `include_router` en `main.py` si es un router nuevo) |
+| 9. Inyección de dependencias | `obtener_material_service` en `api/dependencies.py` |
+| 10. Pruebas de aceptación | `tests/hu/test_hu01_registrar_material.py` |
 
-   ```python
-   async with self._uow:                                   # Unit of Work: una transacción
-       material = await self._materiales.obtener_por_id(id_material)
-       if material is None:
-           raise RecursoNoEncontradoError(formatear(mensajes.HU04_C4, id_material=id_material))
-       ...                                                 # reglas: especificaciones y estados del dominio
-       self._auditar("INHABILITAR_MATERIAL", RECURSO, id_material, 200)
-       await self._uow.commit()
-   self._publicar(TipoEvento.MATERIAL_INHABILITADO, materialId=id_material)
-   return Resultado(material, formatear(mensajes.HU04_C2, id_material=id_material))
-   ```
+**Validación de entrada (400).** En el DTO, la tabla `mensajes_error` asocia cada
+`(campo en camelCase, tipo de error de Pydantic)` con su mensaje (`"*"` = cualquier error del
+campo) y los `@field_validator` usan los objetos de valor y lanzan `error_de_negocio(mensaje)`.
+El manejador global responde 400 con ese texto y el traceId.
 
-   No hace falta capturar los fallos de base de datos ni de las APIs externas: el decorador
-   `@operacion_de_negocio` los traduce al 500 o al 503 con el mensaje de la HU y registra los
-   rechazos en la auditoría.
-4. **Router y DTO de salida**: ya están hechos; revisar que la respuesta tenga los campos del criterio.
-5. **Pruebas**: en `tests/hu/test_hu04_inhabilitar_material.py`, quitar el `skip` de cada
-   criterio implementado y escribir la prueba (código HTTP y mensaje). Para probar el servicio
-   sin base de datos usar `tests/dobles`; para la ruta, ver `tests/unit/test_rutas.py`.
-6. `pytest` en verde y Pull Request con la plantilla.
+**Servicio.** Patrón general (ver `MaterialService.registrar`):
+
+```python
+@operacion_de_negocio("REGISTRAR_MATERIAL", RECURSO, mensaje_error_bd=mensajes.HU01_C8,
+                      mensaje_servicio_externo=mensajes.HU01_C6)
+async def registrar(self, comando):
+    async with self._uow:                                   # Unit of Work: una transacción
+        if await self._materiales.existe_nombre(nombre):
+            raise ConflictoError(formatear(mensajes.HU01_C3, Nombre=nombre))
+    ...
+    async with self._uow:
+        self._materiales.agregar(material)
+        self._auditar("REGISTRAR_MATERIAL", RECURSO, material.id_material, 201)
+        await self._uow.commit()
+    self._publicar(TipoEvento.MATERIAL_REGISTRADO, materialId=material.id_material)
+    return Resultado(material, formatear(mensajes.HU01_C7, Nombre=nombre, SKU=sku))
+```
+
+No hace falta capturar los fallos de base de datos ni de las APIs externas: el decorador
+`@operacion_de_negocio` los traduce al 500 o al 503 con el mensaje de la HU y registra los
+rechazos en la auditoría. Mientras una ruta exista sin su lógica, el servicio puede lanzar
+`NoImplementadoError("HU-XX")` (responde 501).
+
+**Pruebas.** `tests/hu/test_huXX_*.py` con una prueba por criterio (código HTTP y mensaje).
+Para probar sin base de datos, reemplazar el servicio con `app.dependency_overrides` y los
+dobles de `tests/dobles` (como el fixture `escenario` de HU-01). `pytest` en verde y Pull
+Request con la plantilla.
 
 ---
 
@@ -169,24 +186,26 @@ alembic revision --autogenerate -m "cambio"   # nueva migración después de cam
 alembic check                                 # falla si modelos y migraciones difieren (lo prueba la suite)
 ```
 
-- Tablas del MER: `material`, `formula`, `componente_formula`, `evaluacion_patente`,
-  `patente_conflicto` y `auditoria`.
-- IDs `mat-NNN`, `form-NNN` y `tck-NNN` desde secuencias de PostgreSQL (mínimo 3 dígitos;
-  una transacción revertida deja un salto en la numeración).
-- Nombre único sin distinguir mayúsculas: índices `lower(nombre)` en material y fórmula.
-- A lo sumo un trámite de patente abierto por fórmula: índice único parcial.
+- Tablas: `material` y `auditoria` (las del resto del MER se agregan con nuevas migraciones
+  cuando se implementen sus historias).
+- ID `mat-NNN` desde la secuencia `seq_material` de PostgreSQL (mínimo 3 dígitos; una
+  transacción revertida deja un salto en la numeración).
+- Nombre único sin distinguir mayúsculas: índice `lower(nombre)` en `material`.
 - Fechas `TIMESTAMP WITH TIME ZONE` (UTC), devueltas en ISO 8601.
+
+> La migración `0001` se reescribió en el sprint 0 para dejar solo estas dos tablas. Si tienen
+> una base local creada con la versión anterior, recréenla: `docker compose down -v` y
+> `docker compose up` (borra los datos del volumen).
 
 ---
 
 ## 6. Integración con otras células
 
-| | Inventario (célula 4) | Patent Sweep (célula 2) |
-|---|---|---|
-| Este módulo llama | `POST /inventario/materias-primas` (HU-01) y `PATCH /inventario/articulos/{codigo}` (HU-03) | Solicitud de evaluación (HU-09), ruta **POR ACORDAR** |
-| Este módulo recibe | — | `GET /formulas/aprobadas` (HU-11) y `POST /formulas/{id}/dictamen-patente` (HU-10) |
-| Configuración | `INVENTARIO_URL`, `INVENTARIO_RUTA_*` | `PATENT_SWEEP_URL`, `PATENT_SWEEP_RUTA_EVALUACION` |
-| Contrato por acordar | Nombres de los campos JSON y código HTTP del nombre repetido: constantes en `app/data_access/clients/inventario_client.py` | Ruta y código de aceptación: `app/data_access/clients/patent_sweep_client.py` |
+| | Inventario (célula 4) |
+|---|---|
+| Este módulo llama | `POST /inventario/materias-primas` (HU-01 c4) |
+| Configuración | `INVENTARIO_URL`, `INVENTARIO_RUTA_MATERIAS_PRIMAS` |
+| Contrato por acordar | Nombres de los campos JSON y código HTTP del nombre repetido: constantes en `app/infraestructure/clients/inventario_client.py` |
 
 Todas las llamadas salientes tienen timeout total de 5 s, circuit breaker (5 fallos seguidos
 lo abren por 30 s; configurable) y envían las cabeceras `X-Trace-Id` y `X-Servicio-Origen`.
@@ -208,7 +227,7 @@ origen queda en la auditoría.
 | `ReglaDeNegocioError` | 422 |
 | `ErrorInterno` (BD caída o timeout) / cualquier error no controlado | 500 |
 | `NoImplementadoError` (HU pendiente) | 501 |
-| `DependenciaNoDisponibleError` (Inventario o Patent Sweep) | 503 |
+| `DependenciaNoDisponibleError` (Inventario) | 503 |
 
 - Logs: una línea JSON por evento en la salida estándar (`docker compose logs api`), con
   `traceId` y `origen`. Buscar un error por su traceId: `docker compose logs api | grep <traceId>`.
@@ -220,8 +239,8 @@ origen queda en la auditoría.
 
 ## 8. Monitoreo
 
-- `GET /health`: 200 si la API alcanza su base de datos, 503 si no; incluye el estado de los
-  circuit breakers. Lo usan el `HEALTHCHECK` de Docker y el pipeline después de desplegar.
+- `GET /health`: 200 si la API alcanza su base de datos, 503 si no; incluye el estado del
+  circuit breaker de Inventario. Lo usan el `HEALTHCHECK` de Docker y el pipeline después de desplegar.
 - `GET /metrics`: peticiones por ruta y código, latencia, memoria del proceso, llamadas a otras
   células, circuit breakers y eventos de negocio.
 - Prometheus recoge la API y node-exporter (CPU, memoria y disco de la EC2) cada 15 s.
@@ -279,32 +298,32 @@ la EC2 (`ssh -L 9090:localhost:9090 -L 3820:localhost:3820 ...` para verlos).
 
 | Patrón / táctica | Dónde |
 |---|---|
-| Layered Architecture | `app/presentation`, `app/business`, `app/data_access`, `app/core` + `tests/unit/test_arquitectura.py` |
-| DTO · Canonical Schema | `app/presentation/schemas/` (camelCase, `extra="forbid"`) |
-| Soft Delete | `estado = INACTIVO` en `MaterialService.inhabilitar` (HU-04) |
-| Tabla de auditoría | `app/data_access/models/auditoria.py`, `repositories/auditoria_repository.py`, `ServicioBase._auditar` |
+| Layered Architecture | `app/api`, `app/business`, `app/infraestructure`, `app/core` + `lint-imports` y `tests/unit/test_arquitectura.py` |
+| DTO · Canonical Schema | `app/api/schemas/` (camelCase, `extra="forbid"`) |
+| Tabla de auditoría | `app/infraestructure/models/auditoria.py`, `repositories/auditoria_repository.py`, `ServicioBase._auditar` |
 | Observer | `app/core/events.py` (suscriptores: log y métricas) |
-| Correlation ID | `app/presentation/middleware.py`, `app/core/contexto.py`, `app/data_access/clients/base.py` |
-| Unit of Work | `app/data_access/unit_of_work.py` |
+| Correlation ID | `app/api/middleware.py`, `app/core/contexto.py`, `app/infraestructure/clients/base.py` |
+| Unit of Work | `app/infraestructure/unit_of_work.py` |
 | Transaction Script | Cada método de servicio + `@operacion_de_negocio` (`app/business/services/base.py`) |
-| Global Exception Handler | `app/presentation/exception_handlers.py` |
-| Timeout | `app/data_access/database.py` (BD) y `app/data_access/clients/base.py` (HTTP) |
-| Circuit Breaker | `app/data_access/clients/circuit_breaker.py` |
-| Pagination | `app/core/paginacion.py` y repositorios (`LIMIT/OFFSET` en SQL) |
-| Dependency Injection | `app/presentation/dependencies.py` (`Depends`) |
+| Global Exception Handler | `app/api/exception_handlers.py` |
+| Timeout | `app/infraestructure/database.py` (BD) y `app/infraestructure/clients/base.py` (HTTP) |
+| Circuit Breaker | `app/infraestructure/clients/circuit_breaker.py` |
+| Dependency Injection | `app/api/dependencies.py` (`Depends`) |
 | Object Pool | Pool de conexiones (`database.py`) y un `httpx.AsyncClient` compartido (`main.py`) |
-| Gateway | `app/data_access/clients/` |
-| Repository | `app/data_access/interfaces/` + `app/data_access/repositories/` |
-| Value Object · Specification | `app/business/domain/value_objects.py`, `specifications.py` |
-| State | `app/business/domain/formula_states.py` |
-| Domain Service · Service Layer | `app/business/services/` |
+| Gateway | `app/infraestructure/clients/` |
+| Repository | `app/infraestructure/interfaces/` + `app/infraestructure/repositories/` |
+| Value Object | `app/business/domain/value_objects.py` |
+| Service Layer | `app/business/services/` |
 | Externalized Configuration | `app/core/config.py`, `.env.example`, `docker-compose.yml`, secretos de GitHub |
-| Application Metrics · Health Endpoint | `app/core/metrics.py`, `/metrics`, `app/presentation/routers/health.py` |
+| Application Metrics · Health Endpoint | `app/core/metrics.py`, `/metrics`, `app/api/routers/health.py` |
 | Contenerización · límites de recursos | `Dockerfile`, `docker-compose.yml` |
 | Test Double | `tests/dobles/` |
 
+Los patrones que dependen de historias aún no implementadas (Soft Delete en HU-04,
+Pagination, Specification y State en las fórmulas) se agregan junto con esas historias.
+
 RBAC no está implementado: el DAS excluye la autenticación del alcance, así que no hay roles
-que verificar. El callback del dictamen (HU-10) queda abierto, como riesgo documentado.
+que verificar.
 
 ---
 
@@ -312,48 +331,38 @@ que verificar. El callback del dictamen (HU-10) queda abierto, como riesgo docum
 
 ### POR ACORDAR con otras células
 
-1. **Inventario**: nombres de los campos JSON del alta y del cambio de nombre, campo con el
-   Código de artículo en la respuesta y código HTTP con que rechaza un nombre repetido
-   (se asumió 409; constantes en `inventario_client.py`).
-2. **Patent Sweep**: ruta de su API para la solicitud de evaluación (`PATENT_SWEEP_RUTA_EVALUACION`).
+1. **Inventario**: nombres de los campos JSON del alta, campo con el Código de artículo en la
+   respuesta y código HTTP con que rechaza un nombre repetido (se asumió 409; constantes en
+   `inventario_client.py`).
+2. **Patent Sweep** (HU-09, aún sin implementar): URL y ruta de su API para la solicitud de
+   evaluación (`PATENT_SWEEP_URL` y `PATENT_SWEEP_RUTA_EVALUACION`, ya definidas en
+   `.env.example`, `docker-compose.yml` y `config.py`).
 3. URLs de las EC2 de ambas células y uso de las cabeceras `X-Trace-Id` y `X-Servicio-Origen`.
 
-### Vacíos del backlog (confirmar con el PO)
+### Vacíos del backlog en HU-01 (confirmar con el PO)
 
-1. HU-01: no hay mensaje para Densidad o Pureza con valor no válido (solo para "obligatorio").
-2. HU-01 y HU-03: cómo contar "máximo 4 / 3 caracteres" de un número (se cuenta el número sin
-   ceros sobrantes: 7.850 → "7.85" → 4).
-3. HU-02 c3: el listado `GET /materiales` no tiene definidos filtros, tamaño de página ni orden.
-4. HU-02, HU-03, HU-06, HU-07, HU-09 y HU-10: un ID con formato inválido no tiene mensaje 400;
-   se responde 404 (no existe). Solo HU-04 y HU-08 validan el formato (400).
-5. HU-03 c4: si el nombre solo cambia en mayúsculas o minúsculas, ¿se envía a Inventario?
-6. HU-03: no hay mensaje si el cuerpo incluye el ID (solo para SKU y Unidad de medida).
-7. HU-05 y HU-07: no hay mensajes para nombre de más de 80 caracteres, nombre no alfabético,
-   aplicación técnica de más de 200 caracteres, la misma línea de material repetida ni Unidad
-   de medida enviada por el cliente (hoy: 400 con el mensaje genérico).
-8. HU-05: unicidad del nombre de la fórmula sin distinguir mayúsculas (supuesto del MER).
-9. HU-07: el backlog no dice qué pasa si el nuevo nombre ya existe en otra fórmula.
-10. HU-06: nombres de los parámetros de consulta, parámetro de página y zona horaria de las
-    fechas DD/MM/AAAA (UTC o America/Bogota).
-11. HU-09: no hay mensaje 500 para un fallo de la base de datos (se usa el genérico).
-12. HU-10: no hay mensaje si falta `patentesEnConflicto`; en el backlog los mensajes del
-    criterio 6 están numerados 5.1 y 5.2 (en el código: `HU10_C6_1` y `HU10_C6_2`).
-13. Respuestas de HU-04 y HU-08: el backlog solo define el mensaje; se devuelve además el ID y
-    el estado (igual que HU-10 c2).
+1. Un campo enviado con `null`, o un Nombre vacío o solo con espacios, se trata como omitido
+   (mensaje "es obligatorio").
+2. Un Nombre que no es texto (p. ej. un número JSON) responde "contiene caracteres no permitidos".
+3. Si Inventario devuelve un Código de artículo que no tiene el formato MP-00000, se trata como
+   una falla de Inventario (503 con el mensaje de c6) y no se guarda el material.
+4. Si dos peticiones registran el mismo nombre a la vez, el índice único rechaza la segunda y
+   se responde 409 con el mensaje de c3 (Inventario ya habrá registrado el artículo; queda en
+   el log con su SKU).
 
 ### Decisiones tomadas en este código
 
-- Validaciones de contrato → **400** (no el 422 por defecto de FastAPI); 422 solo para reglas de
-  negocio (HU-05, HU-07 y HU-09). HU pendiente → 501.
-- Mensajes genéricos fuera del backlog: ruta inexistente (404), método no permitido (405) y
-  error no controlado (500), en `mensajes.py`.
+- Validaciones de contrato → **400** (no el 422 por defecto de FastAPI); 422 se reserva para
+  reglas de negocio. HU pendiente → 501.
+- Mensajes genéricos fuera del backlog: solicitud no válida sin mensaje propio (400), ruta
+  inexistente (404), método no permitido (405) y error no controlado (500), en `mensajes.py`.
 - Fechas `TIMESTAMPTZ` en lugar de `TIMESTAMP` (la figura del MER), para devolver UTC en ISO 8601.
 - Imagen `postgres:16` (Debian) en lugar de Alpine, para que `lower()` trate bien las tildes.
 - Los rechazos por validación del DTO (400) quedan en el log, no en la tabla de auditoría
   (no llegan a la capa de negocio).
-- `/health` responde 503 solo si falla la base de datos propia; si Inventario o Patent Sweep
-  fallan, la API sigue sana y esas operaciones responden 503.
+- `/health` responde 503 solo si falla la base de datos propia; si Inventario falla, la API
+  sigue sana y las operaciones que lo usan responden 503.
 - Un solo proceso de Uvicorn (las métricas viven en memoria del proceso).
-- Diferencias con la tabla de atributos del DAS: el código usa `app/presentation/routers`,
-  `app/business/services` y `app/presentation/exception_handlers.py` (secciones 1.5 y 2); en la
-  tabla aún aparecen `v1/endpoints`, `use_cases` y el manejador en `app/core`.
+- Diferencias con la tabla de atributos del DAS: el código usa `app/api/routers`,
+  `app/business/services` y `app/api/exception_handlers.py` (secciones 1.5 y 2); en la tabla
+  aún aparecen `v1/endpoints`, `use_cases` y el manejador en `app/core`.
