@@ -5,10 +5,10 @@ from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
 
 from app.core.exceptions import ErrorBaseDatos, ErrorIntegridadDatos
-from app.data_access.database import crear_fabrica_sesiones, crear_motor
-from app.data_access.models import Material
-from app.data_access.repositories import FormulaRepository, MaterialRepository
-from app.data_access.unit_of_work import UnitOfWork
+from app.infraestructure.database import crear_fabrica_sesiones, crear_motor
+from app.infraestructure.models import Material
+from app.infraestructure.repositories import FormulaRepository, MaterialRepository
+from app.infraestructure.unit_of_work import UnitOfWork
 from tests.conftest import URL_SIN_BASE_DE_DATOS, configuracion_de_prueba
 from tests.fabricas import un_material, una_evaluacion, una_formula
 

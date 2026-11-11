@@ -12,9 +12,9 @@ from app.business.services.base import ServicioBase, operacion_de_negocio
 from app.core.contexto import establecer_contexto, restablecer_contexto
 from app.core.events import BusEventos
 from app.core.exceptions import ConflictoError
-from app.data_access.models import Auditoria
-from app.data_access.repositories import AuditoriaRepository
-from app.data_access.unit_of_work import UnitOfWork
+from app.infraestructure.models import Auditoria
+from app.infraestructure.repositories import AuditoriaRepository
+from app.infraestructure.unit_of_work import UnitOfWork
 from app.main import crear_app
 from tests.conftest import configuracion_de_prueba
 

@@ -1,10 +1,10 @@
 """Los valores de las restricciones CHECK coinciden con los enums del dominio."""
 
 from app.business.domain.enums import Categoria, EstadoFormula, EstadoMaterial, ResultadoDictamen, UnidadMedida
-from app.data_access.models import Base
-from app.data_access.models.evaluacion_patente import RESULTADOS_DICTAMEN
-from app.data_access.models.formula import ESTADOS_FORMULA
-from app.data_access.models.material import CATEGORIAS, ESTADOS_MATERIAL, UNIDADES_MEDIDA
+from app.infraestructure.models import Base
+from app.infraestructure.models.evaluacion_patente import RESULTADOS_DICTAMEN
+from app.infraestructure.models.formula import ESTADOS_FORMULA
+from app.infraestructure.models.material import CATEGORIAS, ESTADOS_MATERIAL, UNIDADES_MEDIDA
 
 
 def test_valores_permitidos_iguales_en_modelo_y_dominio() -> None:

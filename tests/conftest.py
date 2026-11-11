@@ -21,9 +21,9 @@ from app.main import crear_app  # noqa: E402
 
 # Base de datos inexistente: la conexión se rechaza de inmediato (puerto 9).
 URL_SIN_BASE_DE_DATOS = "postgresql+asyncpg://nadie:nadie@127.0.0.1:9/ninguna"
-URL_BD_PRUEBAS = os.environ.get(
-    "TEST_DATABASE_URL", "postgresql+asyncpg://materiales:materiales@127.0.0.1:5432/materiales_formulas_test"
-)
+# Sin valor por defecto (no se guardan credenciales en el repositorio): si no está definida,
+# las pruebas de integración se omiten.
+URL_BD_PRUEBAS = os.environ.get("TEST_DATABASE_URL", "")
 
 
 def configuracion_de_prueba(**valores: object) -> Configuracion:

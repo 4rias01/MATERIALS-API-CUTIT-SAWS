@@ -11,8 +11,8 @@ import pytest
 from app.core.config import Configuracion
 from app.core.contexto import establecer_contexto, restablecer_contexto
 from app.core.exceptions import ErrorServicioExterno
-from app.data_access.clients import CircuitBreaker, EstadoCircuito, InventarioClient, PatentSweepClient
-from app.data_access.interfaces import ComponenteEvaluacion, NombreDuplicadoEnInventarioError, SolicitudEvaluacionPatente
+from app.infraestructure.clients import CircuitBreaker, EstadoCircuito, InventarioClient, PatentSweepClient
+from app.infraestructure.interfaces import ComponenteEvaluacion, NombreDuplicadoEnInventarioError, SolicitudEvaluacionPatente
 from tests.conftest import configuracion_de_prueba
 
 Manejador = Callable[[httpx.Request], httpx.Response]

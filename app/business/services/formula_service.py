@@ -13,8 +13,8 @@ from app.business.services.comandos import ActualizarFormulaComando, ConsultaFor
 from app.core.events import BusEventos
 from app.core.exceptions import NoImplementadoError
 from app.core.paginacion import Pagina
-from app.data_access.interfaces import IAuditoriaRepository, IFormulaRepository, IMaterialRepository, IUnitOfWork
-from app.data_access.models import Formula
+from app.infraestructure.interfaces import IAuditoriaRepository, IFormulaRepository, IMaterialRepository, IUnitOfWork
+from app.infraestructure.models import Formula
 
 RECURSO = "formula"
 
