@@ -13,5 +13,5 @@ class SaludRespuesta(EsquemaSalida):
     base_datos: Literal["OK", "ERROR"]
     circuitos: dict[str, str] = Field(
         description="Estado del circuit breaker de cada API externa: CERRADO, ABIERTO o SEMIABIERTO.",
-        examples=[{"inventario": "CERRADO", "patentSweep": "CERRADO"}],
+        examples=[{"inventario": "CERRADO"}],
     )

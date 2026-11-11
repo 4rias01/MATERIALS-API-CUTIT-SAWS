@@ -1,9 +1,8 @@
-"""Clientes de Inventario y Patent Sweep: timeout, circuit breaker, cabeceras y contrato."""
+"""Cliente de Inventario: timeout, circuit breaker, cabeceras y contrato."""
 
 import asyncio
 import json
 from collections.abc import Callable
-from decimal import Decimal
 
 import httpx
 import pytest
@@ -11,8 +10,8 @@ import pytest
 from app.core.config import Configuracion
 from app.core.contexto import establecer_contexto, restablecer_contexto
 from app.core.exceptions import ErrorServicioExterno
-from app.infraestructure.clients import CircuitBreaker, EstadoCircuito, InventarioClient, PatentSweepClient
-from app.infraestructure.interfaces import ComponenteEvaluacion, NombreDuplicadoEnInventarioError, SolicitudEvaluacionPatente
+from app.infraestructure.clients import CircuitBreaker, EstadoCircuito, InventarioClient
+from app.infraestructure.interfaces import NombreDuplicadoEnInventarioError
 from tests.conftest import configuracion_de_prueba
 
 Manejador = Callable[[httpx.Request], httpx.Response]
@@ -32,19 +31,6 @@ def _http(manejador: Manejador) -> httpx.AsyncClient:
 
 def _inventario(manejador: Manejador, config: Configuracion | None = None, circuito: CircuitBreaker | None = None) -> InventarioClient:
     return InventarioClient(_http(manejador), config or configuracion_de_prueba(), circuito or CircuitBreaker("inventario"))
-
-
-def _solicitud() -> SolicitudEvaluacionPatente:
-    return SolicitudEvaluacionPatente(
-        formula_id="form-001",
-        ticket_evaluacion_id="tck-001",
-        nombre="Aleacion",
-        aplicacion_tecnica="Corte",
-        componentes=[
-            ComponenteEvaluacion("mat-001", "Acero", Decimal("2.500"), "kg"),
-            ComponenteEvaluacion("mat-002", "Tornillo", Decimal("4"), "und"),
-        ],
-    )
 
 
 # ---------------------------------------------------------------------------------------
@@ -177,63 +163,8 @@ async def test_circuito_abierto_rechaza_sin_llamar() -> None:
     assert cliente.estado_circuito() == "ABIERTO"
 
 
-async def test_modificar_nombre_articulo() -> None:
-    recibidas: list[httpx.Request] = []
-
-    def manejador(peticion: httpx.Request) -> httpx.Response:
-        recibidas.append(peticion)
-        return httpx.Response(204)
-
-    await _inventario(manejador).modificar_nombre_articulo("MP-00001", "Nuevo nombre")
-    assert recibidas[0].method == "PATCH"
-    assert recibidas[0].url.path == "/inventario/articulos/MP-00001"
-    assert json.loads(recibidas[0].content) == {"nombre": "Nuevo nombre"}
-
-
 async def test_sin_url_configurada() -> None:
     cliente = _inventario(lambda _: httpx.Response(201), config=configuracion_de_prueba(inventario_url=None))
     with pytest.raises(ErrorServicioExterno) as error:
         await cliente.registrar_materia_prima("Acero", "kg")
-    assert error.value.causa == ErrorServicioExterno.SIN_CONFIGURAR
-
-
-# ---------------------------------------------------------------------------------------
-# Patent Sweep
-# ---------------------------------------------------------------------------------------
-
-
-async def test_solicitud_de_evaluacion_con_el_contrato_de_hu09() -> None:
-    recibidas: list[httpx.Request] = []
-
-    def manejador(peticion: httpx.Request) -> httpx.Response:
-        recibidas.append(peticion)
-        return httpx.Response(202)
-
-    cliente = PatentSweepClient(_http(manejador), configuracion_de_prueba(), CircuitBreaker("patent_sweep"))
-    await cliente.solicitar_evaluacion(_solicitud())
-    assert str(recibidas[0].url) == "http://patent-sweep.prueba/evaluaciones"
-    assert json.loads(recibidas[0].content) == {
-        "formulaId": "form-001",
-        "ticketEvaluacionId": "tck-001",
-        "nombre": "Aleacion",
-        "aplicacionTecnica": "Corte",
-        "componentes": [
-            {"materialId": "mat-001", "nombre": "Acero", "cantidad": 2.5, "unidadMedida": "kg"},
-            {"materialId": "mat-002", "nombre": "Tornillo", "cantidad": 4, "unidadMedida": "und"},
-        ],
-    }
-
-
-async def test_patent_sweep_debe_responder_202() -> None:
-    cliente = PatentSweepClient(_http(lambda _: httpx.Response(200)), configuracion_de_prueba(), CircuitBreaker("patent_sweep"))
-    with pytest.raises(ErrorServicioExterno) as error:
-        await cliente.solicitar_evaluacion(_solicitud())
-    assert error.value.causa == ErrorServicioExterno.RESPUESTA_INESPERADA
-
-
-async def test_patent_sweep_sin_ruta_configurada() -> None:
-    config = configuracion_de_prueba(patent_sweep_ruta_evaluacion=None)
-    cliente = PatentSweepClient(_http(lambda _: httpx.Response(202)), config, CircuitBreaker("patent_sweep"))
-    with pytest.raises(ErrorServicioExterno) as error:
-        await cliente.solicitar_evaluacion(_solicitud())
     assert error.value.causa == ErrorServicioExterno.SIN_CONFIGURAR
