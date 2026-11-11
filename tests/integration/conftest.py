@@ -1,6 +1,6 @@
 """Base de datos de las pruebas de integración.
 
-Usa ``TEST_DATABASE_URL`` (por defecto, la base materiales_formulas_test en localhost).
+Usa ``TEST_DATABASE_URL`` (sin valor por defecto).
 Al iniciar la sesión aplica las migraciones desde cero; antes de cada prueba vacía las
 tablas y reinicia las secuencias. Si la base no responde, las pruebas se omiten.
 """
@@ -15,7 +15,7 @@ from alembic.config import Config
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
 
-from app.data_access.database import crear_fabrica_sesiones
+from app.infraestructure.database import crear_fabrica_sesiones
 from tests.conftest import URL_BD_PRUEBAS
 
 RAIZ = Path(__file__).resolve().parents[2]
@@ -53,7 +53,7 @@ def _base_disponible(url: str) -> bool:
 
 @pytest.fixture(scope="session")
 def url_base_datos() -> str:
-    if not _base_disponible(URL_BD_PRUEBAS):
+    if not URL_BD_PRUEBAS or not _base_disponible(URL_BD_PRUEBAS):
         pytest.skip("PostgreSQL no disponible: defina TEST_DATABASE_URL para correr las pruebas de integración")
     config = configuracion_alembic()
     command.downgrade(config, "base")

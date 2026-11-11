@@ -11,8 +11,8 @@ from app.business.services.comandos import ActualizarMaterialComando, RegistrarM
 from app.core.events import BusEventos
 from app.core.exceptions import NoImplementadoError
 from app.core.paginacion import Pagina
-from app.data_access.interfaces import IAuditoriaRepository, IInventarioClient, IMaterialRepository, IUnitOfWork
-from app.data_access.models import Material
+from app.infraestructure.interfaces import IAuditoriaRepository, IInventarioClient, IMaterialRepository, IUnitOfWork
+from app.infraestructure.models import Material
 
 RECURSO = "material"
 

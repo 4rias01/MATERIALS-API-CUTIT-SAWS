@@ -1,7 +1,7 @@
 """Clientes de Inventario y Patent Sweep simulados."""
 
 from app.core.exceptions import ErrorServicioExterno
-from app.data_access.interfaces import (
+from app.infraestructure.interfaces import (
     IInventarioClient,
     IPatentSweepClient,
     NombreDuplicadoEnInventarioError,

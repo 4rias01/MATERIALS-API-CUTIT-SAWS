@@ -4,7 +4,7 @@ import logging
 from dataclasses import dataclass, field
 
 from app.core.exceptions import ErrorBaseDatos
-from app.data_access.interfaces import IInventarioClient, IPatentSweepClient, IUnitOfWork
+from app.infraestructure.interfaces import IInventarioClient, IPatentSweepClient, IUnitOfWork
 
 logger = logging.getLogger(__name__)
 

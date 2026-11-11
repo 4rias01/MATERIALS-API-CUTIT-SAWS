@@ -94,7 +94,7 @@ docker compose up --build     # usa docker-compose.yml + docker-compose.override
 python3.12 -m venv .venv && source .venv/bin/activate
 pip install -r requirements-dev.txt
 cp .env.example .env                       # agregar POSTGRES_HOST=localhost
-docker compose up -d postgres              # PostgreSQL en localhost:5432
+docker compose up -d postgres              # PostgreSQL en localhost:POSTGRES_PUERTO_HOST
 alembic upgrade head
 uvicorn app.main:app --reload
 ```
@@ -110,12 +110,13 @@ pytest -m integracion                      # requiere TEST_DATABASE_URL
 pytest --cov --cov-report=term-missing     # cobertura
 ```
 
-Las pruebas de integración usan `TEST_DATABASE_URL`
-(por defecto `postgresql+asyncpg://materiales:materiales@127.0.0.1:5432/materiales_formulas_test`).
+Las pruebas de integración usan `TEST_DATABASE_URL` (sin valor por defecto; si no está
+definida se omiten), por ejemplo `postgresql+asyncpg://<usuario>:<clave>@127.0.0.1:<POSTGRES_PUERTO_HOST>/materiales_formulas_test`.
+En el CI, PostgreSQL se levanta con `docker compose` y el `.env` se crea desde el secreto `ENV_CI`.
 Al empezar, aplican las migraciones desde cero en esa base: **no la apunten a una base con datos**.
 
 ```bash
-docker compose exec postgres createdb -U materiales materiales_formulas_test
+docker compose exec postgres sh -c 'createdb -U "$POSTGRES_USER" materiales_formulas_test'
 ```
 
 ---
