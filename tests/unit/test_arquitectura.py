@@ -1,10 +1,10 @@
 """Reglas de dependencia de la arquitectura en capas del DAS (sección 2).
 
-* Cada capa depende solo de la de abajo: presentation → business → data_access.
+* Cada capa depende solo de la de abajo: api → business → infraestructure.
 * Todas pueden usar app/core; app/core no depende de ninguna capa.
 * Los servicios no dependen de FastAPI ni de SQL concreto (meta de Reuso).
 * El dominio no depende de frameworks.
-* Excepciones (raíces de composición): app/main.py y app/presentation/dependencies.py
+* Excepciones (raíces de composición): app/main.py y app/api/dependencies.py
   conocen las implementaciones concretas para inyectarlas.
 """
 
@@ -15,7 +15,7 @@ import pytest
 
 RAIZ = Path(__file__).resolve().parents[2]
 APP = RAIZ / "app"
-RAICES_DE_COMPOSICION = {APP / "main.py", APP / "presentation" / "dependencies.py"}
+RAICES_DE_COMPOSICION = {APP / "main.py", APP / "api" / "dependencies.py"}
 
 
 def _importaciones(archivo: Path) -> set[str]:
@@ -45,12 +45,13 @@ def _violaciones(paquete: str, prohibidos: tuple[str, ...]) -> list[str]:
 @pytest.mark.parametrize(
     ("paquete", "prohibidos"),
     [
-        ("core", ("app.presentation", "app.business", "app.data_access")),
-        ("data_access", ("app.presentation", "app.business")),
-        ("business", ("app.presentation", "fastapi", "starlette", "sqlalchemy", "httpx", "pydantic")),
-        ("business/domain", ("app.data_access", "app.presentation", "fastapi", "sqlalchemy", "pydantic", "httpx")),
-        ("presentation", ("app.data_access", "sqlalchemy", "httpx")),
+        ("core", ("app.api", "app.business", "app.infraestructure")),
+        ("infraestructure", ("app.api", "app.business")),
+        ("business", ("app.api", "fastapi", "starlette", "sqlalchemy", "httpx", "pydantic")),
+        ("business/domain", ("app.infraestructure", "app.api", "fastapi", "sqlalchemy", "pydantic", "httpx")),
+        ("api", ("app.infraestructure", "sqlalchemy", "httpx")),
     ],
 )
 def test_cada_capa_depende_solo_de_la_de_abajo(paquete: str, prohibidos: tuple[str, ...]) -> None:
+    assert _archivos(paquete), f"app/{paquete} no existe o está vacío"
     assert _violaciones(paquete, prohibidos) == []

@@ -1,20 +1,38 @@
-"""Casos de uso del catálogo de materiales (HU-01 a HU-04).
+"""Casos de uso del catálogo de materiales.
 
-Estado: esqueleto. Cada método documenta los pasos que pide el backlog y lanza
-``NoImplementadoError`` (501) hasta que se implemente. El router, el DTO, la
-inyección de dependencias, el manejo de errores y la auditoría ya funcionan.
+HU-01 (registrar material) es el flujo de ejemplo del sprint 0: recorre las tres capas
+(router → servicio → repositorio y cliente de Inventario) y sirve de modelo para las
+siguientes historias de usuario.
 """
 
+import logging
+
 from app.business.domain import mensajes
-from app.business.services.base import Resultado, ServicioBase, operacion_de_negocio
-from app.business.services.comandos import ActualizarMaterialComando, RegistrarMaterialComando
+from app.business.domain.enums import EstadoMaterial
+from app.business.domain.errores import ValorInvalidoError
+from app.business.domain.eventos import TipoEvento
+from app.business.domain.mensajes import formatear
+from app.business.domain.value_objects import Sku, id_material, normalizar_nombre
+from app.business.services.base import Resultado, ServicioBase, ahora, operacion_de_negocio
+from app.business.services.comandos import RegistrarMaterialComando
 from app.core.events import BusEventos
-from app.core.exceptions import NoImplementadoError
-from app.core.paginacion import Pagina
-from app.data_access.interfaces import IAuditoriaRepository, IInventarioClient, IMaterialRepository, IUnitOfWork
-from app.data_access.models import Material
+from app.core.exceptions import ConflictoError, ErrorBaseDatos, ErrorIntegridadDatos, ErrorServicioExterno
+from app.infraestructure.interfaces import (
+    IAuditoriaRepository,
+    IInventarioClient,
+    IMaterialRepository,
+    IUnitOfWork,
+    NombreDuplicadoEnInventarioError,
+)
+from app.infraestructure.models import Material
+
+logger = logging.getLogger(__name__)
 
 RECURSO = "material"
+OPERACION_REGISTRAR = "REGISTRAR_MATERIAL"
+SERVICIO_INVENTARIO = "inventario"
+# Índice único lower(nombre) de la tabla material (app/infraestructure/models/material.py).
+RESTRICCION_NOMBRE_UNICO = "uq_material_nombre_lower"
 
 
 class MaterialService(ServicioBase):
@@ -31,7 +49,7 @@ class MaterialService(ServicioBase):
         self._inventario = inventario
 
     @operacion_de_negocio(
-        "REGISTRAR_MATERIAL",
+        OPERACION_REGISTRAR,
         RECURSO,
         mensaje_error_bd=mensajes.HU01_C8,
         mensaje_servicio_externo=mensajes.HU01_C6,
@@ -39,98 +57,81 @@ class MaterialService(ServicioBase):
     async def registrar(self, comando: RegistrarMaterialComando) -> Resultado[Material]:
         """HU-01 · POST /materiales → 201 con el material creado y ``HU01_C7``.
 
-        TODO(HU-01):
-        1. Nombre ya normalizado y validado por el schema (c1 y c2); usar
-           ``NombreMaterial.crear`` si se necesita el objeto de valor.
-        2. ``async with self._uow:`` si ``await self._materiales.existe_nombre(nombre)``
-           → ``ConflictoError(formatear(HU01_C3, Nombre=nombre))`` (c3).
-        3. Fuera de la transacción (no retener la conexión mientras se espera):
-           ``sku = await self._inventario.registrar_materia_prima(nombre, unidad_medida)``
-           (c4, se envía sin importar la categoría).
-           - ``NombreDuplicadoEnInventarioError`` → ``ConflictoError(formatear(HU01_C5, Nombre=nombre))`` (c5).
-           - ``ErrorServicioExterno`` → el decorador responde 503 con ``HU01_C6`` (c6).
-        4. ``async with self._uow:``
-           - ``id = id_material(await self._materiales.siguiente_numero())`` y ``fecha = ahora()``.
-           - Agregar ``Material(id_material=id, sku=sku, ..., estado=EstadoMaterial.ACTIVO,
-             fecha_registro=fecha, fecha_actualizacion=fecha)`` (c7.1 a c7.5).
-           - ``self._auditar("REGISTRAR_MATERIAL", RECURSO, id, 201, {"sku": sku})``.
-           - ``await self._uow.commit()``. Si lanza ``ErrorBaseDatos``: registrar en el log
-             el SKU que asignó Inventario (c8) y relanzar; el decorador responde 500 con
-             ``HU01_C8``. Si es ``ErrorIntegridadDatos`` con restricción
-             ``uq_material_nombre_lower`` (registro simultáneo), responder 409 con ``HU01_C3``.
-        5. ``self._publicar(TipoEvento.MATERIAL_REGISTRADO, materialId=id, sku=sku)``.
-        6. ``return Resultado(material, formatear(HU01_C7, Nombre=nombre, SKU=sku))``.
+        El schema ya validó los campos y normalizó el nombre (c1 y c2). El decorador
+        traduce los fallos técnicos: Inventario caído o lento → 503 con ``HU01_C6`` (c6);
+        base de datos caída o lenta → 500 con ``HU01_C8`` (c8). Ambos incluyen el traceId.
         """
-        raise NoImplementadoError("HU-01")
+        # Idempotente: el schema ya lo hizo, pero el servicio no depende de quién lo llame.
+        nombre = normalizar_nombre(comando.nombre)
 
-    @operacion_de_negocio("CONSULTAR_MATERIAL", RECURSO, mensaje_error_bd=mensajes.HU02_C5, auditar=False)
-    async def consultar(self, id_material: str) -> Resultado[Material]:
-        """HU-02 · GET /materiales/{id} → 200 con la ficha técnica (9 campos), sin mensaje.
+        await self._verificar_nombre_disponible(nombre)
+        # Fuera de la transacción: no se retiene una conexión mientras se espera a Inventario.
+        sku = await self._registrar_en_inventario(nombre, comando.unidad_medida)
+        material = await self._guardar(comando, nombre, sku)
 
-        TODO(HU-02):
-        1. ``async with self._uow:`` ``material = await self._materiales.obtener_por_id(id_material)``
-           (ACTIVO o INACTIVO, c2).
-        2. Si no existe → ``RecursoNoEncontradoError(formatear(HU02_C4, IDIngresado=id_material))`` (c4).
-        3. Fallo de BD → el decorador responde 500 con ``HU02_C5`` y reemplaza ``[traceId]`` (c5).
-        4. ``return Resultado(material)``.
-        """
-        raise NoImplementadoError("HU-02")
+        self._publicar(TipoEvento.MATERIAL_REGISTRADO, materialId=material.id_material, sku=sku)
+        return Resultado(material, formatear(mensajes.HU01_C7, Nombre=nombre, SKU=sku))
 
-    @operacion_de_negocio("LISTAR_MATERIALES", RECURSO, mensaje_error_bd=mensajes.HU02_C5, auditar=False)
-    async def listar(self, pagina: int, tamano_pagina: int) -> Resultado[Pagina[Material]]:
-        """HU-02 c3 · GET /materiales → 200 con la página de materiales.
+    async def _verificar_nombre_disponible(self, nombre: str) -> None:
+        """c3: el nombre no se repite en el catálogo, sin distinguir mayúsculas."""
+        async with self._uow:
+            if await self._materiales.existe_nombre(nombre):
+                raise ConflictoError(formatear(mensajes.HU01_C3, Nombre=nombre))
 
-        TODO(HU-02 c3): el backlog solo menciona el listado para el error de filtros
-        (400 con ``HU02_C3``). Definir con el PO los filtros, el tamaño de página y el
-        orden antes de implementar. El repositorio ya pagina y ordena por ID.
-        """
-        raise NoImplementadoError("HU-02")
+    async def _registrar_en_inventario(self, nombre: str, unidad_medida: str) -> str:
+        """c4 y c5: registra la materia prima en Inventario (sin importar la categoría) y
+        devuelve el SKU que asignó."""
+        try:
+            codigo = await self._inventario.registrar_materia_prima(nombre, unidad_medida)
+        except NombreDuplicadoEnInventarioError as exc:
+            raise ConflictoError(formatear(mensajes.HU01_C5, Nombre=nombre)) from exc
+        try:
+            return Sku(codigo).valor  # c7.2: formato MP-00000
+        except ValorInvalidoError as exc:
+            logger.error("Inventario devolvió un Código de artículo con formato inválido", extra={"codigoRecibido": codigo})
+            raise ErrorServicioExterno(
+                SERVICIO_INVENTARIO, ErrorServicioExterno.RESPUESTA_INESPERADA, detalle=f"codigo={codigo!r}"
+            ) from exc
 
-    @operacion_de_negocio(
-        "ACTUALIZAR_MATERIAL",
-        RECURSO,
-        mensaje_error_bd=mensajes.HU03_C10,
-        mensaje_servicio_externo=mensajes.HU03_C6,
-        parametro_id="id_material",
-    )
-    async def actualizar(self, id_material: str, comando: ActualizarMaterialComando) -> Resultado[Material]:
-        """HU-03 · PUT /materiales/{id} → 200 con el material y ``HU03_C7``.
+    async def _guardar(self, comando: RegistrarMaterialComando, nombre: str, sku: str) -> Material:
+        """c7 y c8: guarda el material en estado ACTIVO; si la base de datos falla, la unidad
+        de trabajo revierte y queda en el log el SKU que ya asignó Inventario."""
+        try:
+            async with self._uow:
+                fecha = ahora()
+                material = Material(
+                    id_material=id_material(await self._materiales.siguiente_numero()),
+                    sku=sku,
+                    nombre=nombre,
+                    categoria=comando.categoria,
+                    unidad_medida=comando.unidad_medida,
+                    densidad=comando.densidad,
+                    pureza=comando.pureza,
+                    estado=EstadoMaterial.ACTIVO,
+                    fecha_registro=fecha,
+                    fecha_actualizacion=fecha,
+                )
+                self._materiales.agregar(material)
+                self._auditar(OPERACION_REGISTRAR, RECURSO, material.id_material, 201, {"sku": sku})
+                await self._uow.commit()
+        except ErrorIntegridadDatos as exc:
+            if exc.restriccion != RESTRICCION_NOMBRE_UNICO:
+                self._registrar_fallo_al_guardar(sku, nombre)
+                raise
+            # Otra petición registró el mismo nombre entre la verificación (c3) y el commit.
+            logger.warning("Nombre registrado por una petición simultánea", extra={"sku": sku, "nombre": nombre})
+            raise ConflictoError(formatear(mensajes.HU01_C3, Nombre=nombre)) from exc
+        except ErrorBaseDatos:
+            self._registrar_fallo_al_guardar(sku, nombre)
+            raise
+        return material
 
-        TODO(HU-03):
-        1. El schema ya rechazó SKU, Unidad de medida y los datos no válidos (c2).
-        2. ``async with self._uow:``
-           - ``material = await self._materiales.obtener_por_id(id_material)``; si no existe →
-             ``RecursoNoEncontradoError(formatear(HU03_C8, id_material=id_material))`` (c8).
-           - Si ``material.estado == EstadoMaterial.INACTIVO`` → ``ConflictoError(HU03_C9)`` (c9).
-           - Si ``await self._materiales.existe_nombre(nombre, excluir_id=id_material)`` →
-             ``ConflictoError(formatear(HU03_C3, Nombre=nombre))`` (c3).
-        3. Si el nombre cambió (comparar sin distinguir mayúsculas lo decide el equipo):
-           ``await self._inventario.modificar_nombre_articulo(material.sku, nombre)`` (c4).
-           Si solo cambian Categoría, Densidad o Pureza no se llama a Inventario.
-           - ``NombreDuplicadoEnInventarioError`` → ``ConflictoError(formatear(HU03_C5, Nombre=nombre))`` (c5).
-           - ``ErrorServicioExterno`` → el decorador responde 503 con ``HU03_C6`` (c6).
-        4. Actualizar los campos, ``material.fecha_actualizacion = ahora()``, auditar (200) y
-           ``commit`` (c7). Fallo de BD → el decorador responde 500 con ``HU03_C10`` (c10).
-        5. Publicar ``TipoEvento.MATERIAL_ACTUALIZADO`` y
-           ``return Resultado(material, formatear(HU03_C7, Nombre=nombre))``.
-        """
-        raise NoImplementadoError("HU-03")
-
-    @operacion_de_negocio("INHABILITAR_MATERIAL", RECURSO, mensaje_error_bd=mensajes.HU04_C7, parametro_id="id_material")
-    async def inhabilitar(self, id_material: str) -> Resultado[Material]:
-        """HU-04 · DELETE /materiales/{id} → 200 con ``HU04_C2`` (borrado lógico).
-
-        TODO(HU-04):
-        1. El router ya validó el formato mat-NNN; si no, responde 400 con ``HU04_C3`` (c1 y c3).
-        2. ``async with self._uow:``
-           - Si no existe → ``RecursoNoEncontradoError(formatear(HU04_C4, id_material=id_material))`` (c4).
-           - Si ya está INACTIVO → ``ConflictoError(formatear(HU04_C6, id_material=id_material))`` (c6).
-           - Si ``await self._materiales.pertenece_a_formulas_con_estado(id_material, ESTADOS_VIGENTES)``
-             → ``ConflictoError(HU04_C5)`` (c5; ``ESTADOS_VIGENTES`` está en formula_states).
-           - ``material.estado = EstadoMaterial.INACTIVO``; ``material.fecha_actualizacion = ahora()``;
-             auditar (200); ``commit``. No se llama a Inventario (c2).
-           Fallo de BD → el decorador responde 500 con ``HU04_C7`` (c7).
-        3. Publicar ``TipoEvento.MATERIAL_INHABILITADO`` y
-           ``return Resultado(material, formatear(HU04_C2, id_material=id_material))``.
-        """
-        raise NoImplementadoError("HU-04")
+    @staticmethod
+    def _registrar_fallo_al_guardar(sku: str, nombre: str) -> None:
+        # El traceId lo agrega el formateador del log; el detalle del error lo registra el
+        # manejador global de excepciones con el mismo traceId.
+        logger.error(
+            "No se pudo guardar el material; Inventario ya le asignó el SKU %s",
+            sku,
+            extra={"sku": sku, "nombre": nombre},
+        )
