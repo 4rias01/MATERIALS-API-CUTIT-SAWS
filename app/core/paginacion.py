@@ -2,7 +2,7 @@
 
 import math
 from dataclasses import dataclass
-from typing import Generic, TypeVar
+from typing import TypeVar
 
 T = TypeVar("T")
 
@@ -13,7 +13,7 @@ def calcular_desplazamiento(pagina: int, tamano_pagina: int) -> int:
 
 
 @dataclass(frozen=True, slots=True)
-class Pagina(Generic[T]):
+class Pagina[T]:
     """Una página de resultados y los totales de la consulta completa."""
 
     elementos: list[T]

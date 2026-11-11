@@ -58,7 +58,9 @@ tests/
 ├── dobles/                     Repositorios y clientes en memoria (Test Double)
 └── fabricas.py                 Objetos de prueba con valores válidos
 monitoring/                     prometheus.yml y aprovisionamiento + tablero de Grafana
-.github/workflows/ci-cd.yml     Pipeline: build, pruebas, SonarCloud, imagen en GHCR y despliegue en EC2
+.github/workflows/ci.yml        Integración continua (develop): ruff, mypy, import-linter, pruebas, SonarCloud
+.github/workflows/cd.yml        Despliegue continuo (main): imagen en GHCR y despliegue en EC2
+pyproject.toml                  Configuración de ruff, mypy e import-linter
 ```
 
 **Regla de dependencias** (la verifica `tests/unit/test_arquitectura.py`):
@@ -76,16 +78,16 @@ Requisitos: Python 3.12 y Docker con el plugin Compose.
 ### Todo con Docker Compose
 
 ```bash
-cp .env.example .env          # completar claves; para pruebas locales las URLs de otras células pueden quedar así
+cp .env.example .env          # completar usuarios y claves; las URLs de otras células pueden quedar vacías
 docker compose up --build     # usa docker-compose.yml + docker-compose.override.yml
 ```
 
 | Servicio | URL |
 |---|---|
-| Swagger (contrato) | http://localhost:8000/docs |
-| Estado | http://localhost:8000/health |
-| Métricas | http://localhost:8000/metrics |
-| Grafana | http://localhost:3000 (usuario y clave del `.env`) |
+| Swagger (contrato) | http://localhost:API_PUERTO_HOST/docs |
+| Estado | http://localhost:API_PUERTO_HOST/health |
+| Métricas | http://localhost:API_PUERTO_HOST/metrics |
+| Grafana | http://localhost:3820 (usuario y clave del `.env`) |
 | Prometheus | http://localhost:9090 |
 
 ### API en Python, base de datos en Docker (para desarrollar)
@@ -93,7 +95,7 @@ docker compose up --build     # usa docker-compose.yml + docker-compose.override
 ```bash
 python3.12 -m venv .venv && source .venv/bin/activate
 pip install -r requirements-dev.txt
-cp .env.example .env                       # agregar POSTGRES_HOST=localhost
+cp .env.example .env                       # completar y descomentar POSTGRES_HOST/POSTGRES_PORT
 docker compose up -d postgres              # PostgreSQL en localhost:POSTGRES_PUERTO_HOST
 alembic upgrade head
 uvicorn app.main:app --reload
@@ -107,12 +109,15 @@ uvicorn app.main:app --reload
 pytest                                     # todo (las de integración se omiten si no hay PostgreSQL)
 pytest tests/unit                          # rápidas, sin base de datos
 pytest -m integracion                      # requiere TEST_DATABASE_URL
-pytest --cov --cov-report=term-missing     # cobertura
+pytest --cov --cov-report=term-missing     # cobertura (el CI exige 80 %)
+ruff check .                               # linter
+mypy                                       # type checker
+lint-imports                               # arquitectura: api -> business -> infraestructure -> core
 ```
 
 Las pruebas de integración usan `TEST_DATABASE_URL` (sin valor por defecto; si no está
 definida se omiten), por ejemplo `postgresql+asyncpg://<usuario>:<clave>@127.0.0.1:<POSTGRES_PUERTO_HOST>/materiales_formulas_test`.
-En el CI, PostgreSQL se levanta con `docker compose` y el `.env` se crea desde el secreto `ENV_CI`.
+En el CI, PostgreSQL se levanta con `docker compose` y las credenciales salen de los secretos `POSTGRES_USER` y `POSTGRES_PASSWORD`.
 Al empezar, aplican las migraciones desde cero en esa base: **no la apunten a una base con datos**.
 
 ```bash
@@ -227,20 +232,26 @@ origen queda en la auditoría.
 
 ## 9. CI/CD y despliegue
 
-**Pipeline** (`.github/workflows/ci-cd.yml`):
+**Integración continua** (`.github/workflows/ci.yml`), en cada Pull Request y push a `develop`:
 
-1. En cada Pull Request hacia `main`: build, pruebas (unitarias e integración con PostgreSQL) y
-   análisis de SonarCloud con quality gate.
-2. Al fusionar el PR en `main`: lo mismo y, solo si se aprueba el quality gate, se publica la
-   imagen en GHCR (`ghcr.io/<propietario>/materiales-formulas-api:<commit>` y `:latest`) y se
-   despliega en la EC2 por SSH; al final se verifica `/health`.
+1. Calidad: linter (`ruff`), type checker (`mypy`) y validación de arquitectura (`import-linter`).
+2. Pruebas unitarias y de integración contra PostgreSQL (levantado con `docker compose`),
+   cobertura mínima del 80 % y análisis de SonarCloud con quality gate.
+3. Build de la imagen Docker (sin publicarla).
+
+**Despliegue continuo** (`.github/workflows/cd.yml`), en cada push a `main` (al fusionar `develop`):
+se publica la imagen en GHCR (`ghcr.io/<propietario>/materiales-formulas-api:<commit>` y `:latest`)
+y se despliega en la EC2 por SSH; al final se verifica `/health`.
 
 **Configuración única en GitHub**
 
-1. *Settings → Branches*: regla para `main` con "Require a pull request before merging",
-   1 aprobación y el check obligatorio **Build, pruebas y SonarCloud**.
+1. *Settings → Branches*: regla para `develop` con "Require a pull request before merging",
+   1 aprobación y los checks obligatorios **Linter, type checker y arquitectura**,
+   **Pruebas, cobertura y SonarCloud** y **Build de la imagen Docker**; regla para `main` con
+   "Require a pull request before merging" (solo se fusiona `develop`).
 2. *Settings → Secrets and variables → Actions*: `SONAR_TOKEN`, `EC2_HOST`, `EC2_USUARIO`,
-   `EC2_LLAVE_SSH` (y opcionalmente la variable `EC2_DIRECTORIO`).
+   `EC2_LLAVE_SSH`, `POSTGRES_USER` y `POSTGRES_PASSWORD` (BD de pruebas del CI), y opcionalmente
+   la variable `EC2_DIRECTORIO`.
 
 **SonarCloud**: importar el repositorio, desactivar *Automatic Analysis* (el análisis lo hace
 el pipeline), generar el token y poner la organización y la llave del proyecto en
@@ -251,15 +262,16 @@ el pipeline), generar el token y poner la organización y la llave del proyecto 
 ```bash
 # Docker Engine y el plugin Compose instalados; el usuario SSH en el grupo docker.
 mkdir -p ~/materiales-formulas && cd ~/materiales-formulas
-nano .env      # copiar .env.example y completar: claves, API_IMAGEN en minúsculas, URLs de las otras células
+nano .env      # copiar .env.example y completar: usuarios, claves y URLs de las otras células
 ```
 
-Grupo de seguridad: 22 (SSH del pipeline), 8000 (API, para las otras células) y 3000
-(Grafana, para el equipo). PostgreSQL y node-exporter no se publican; Prometheus solo escucha
-en localhost de la EC2 (`ssh -L 9090:localhost:9090 ...` para verlo).
+Grupo de seguridad: 22 (SSH del pipeline) y `API_PUERTO_HOST` (API), abierto solo a las IP de
+las EC2 de las otras células.
+PostgreSQL y node-exporter no se publican; Prometheus y Grafana solo escuchan en localhost de
+la EC2 (`ssh -L 9090:localhost:9090 -L 3820:localhost:3820 ...` para verlos).
 
 **Volver a una versión anterior** (en la EC2):
-`API_TAG=<commit anterior> docker compose up -d api`.
+`API_IMAGEN=ghcr.io/<propietario>/materiales-formulas-api API_TAG=<commit anterior> docker compose up -d api`.
 
 ---
 

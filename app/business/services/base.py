@@ -22,7 +22,7 @@ import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any, Generic, TypeVar
+from typing import Any, TypeVar
 
 from app.core.contexto import nuevo_trace_id, obtener_origen, obtener_trace_id
 from app.core.events import BusEventos, EventoDominio
@@ -47,7 +47,7 @@ _LONGITUD_ORIGEN = 100
 
 
 @dataclass(frozen=True, slots=True)
-class Resultado(Generic[T]):
+class Resultado[T]:
     """Lo que devuelve un caso de uso: los datos y, si el backlog lo define, el mensaje."""
 
     datos: T

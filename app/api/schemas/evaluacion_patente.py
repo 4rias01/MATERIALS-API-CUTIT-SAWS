@@ -4,10 +4,10 @@ from typing import Any, Self
 
 from pydantic import Field
 
+from app.api.schemas.comun import EsquemaEntrada, EsquemaSalida
 from app.business.domain.enums import EstadoFormula, ResultadoDictamen
 from app.business.domain.value_objects import PATRON_TICKET_EVALUACION
 from app.business.services.comandos import PatenteConflictoDato, RegistrarDictamenComando
-from app.api.schemas.comun import EsquemaEntrada, EsquemaSalida
 
 
 class PatenteConflictoSolicitud(EsquemaEntrada):

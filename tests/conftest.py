@@ -12,12 +12,12 @@ from collections.abc import AsyncIterator
 os.environ.setdefault("ENTORNO", "pruebas")
 os.environ.setdefault("LOG_NIVEL", "WARNING")
 
-import httpx  # noqa: E402
-import pytest  # noqa: E402
-from fastapi import FastAPI  # noqa: E402
+import httpx
+import pytest
+from fastapi import FastAPI
 
-from app.core.config import Configuracion  # noqa: E402
-from app.main import crear_app  # noqa: E402
+from app.core.config import Configuracion
+from app.main import crear_app
 
 # Base de datos inexistente: la conexión se rechaza de inmediato (puerto 9).
 URL_SIN_BASE_DE_DATOS = "postgresql+asyncpg://nadie:nadie@127.0.0.1:9/ninguna"

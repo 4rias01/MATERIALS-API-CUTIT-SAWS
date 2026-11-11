@@ -13,7 +13,7 @@ from functools import lru_cache
 from typing import Literal
 from urllib.parse import quote
 
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -34,9 +34,10 @@ class Configuracion(BaseSettings):
 
     # --- Base de datos (PostgreSQL) ------------------------------------------------
     # Si DATABASE_URL está definida, tiene prioridad sobre las variables POSTGRES_*.
+    # Usuario y clave no tienen valor por defecto: deben venir del entorno (.env).
     database_url: str | None = None
-    postgres_user: str = "materiales"
-    postgres_password: str = "materiales"
+    postgres_user: str | None = None
+    postgres_password: SecretStr | None = None
     postgres_host: str = "postgres"
     postgres_port: int = 5432
     postgres_db: str = "materiales_formulas"
@@ -71,8 +72,10 @@ class Configuracion(BaseSettings):
         """URL de conexión de SQLAlchemy con el driver asíncrono asyncpg."""
         if self.database_url:
             return self.database_url
+        if not self.postgres_user or not self.postgres_password:
+            raise ValueError("Defina POSTGRES_USER y POSTGRES_PASSWORD (o DATABASE_URL) en el entorno")
         usuario = quote(self.postgres_user, safe="")
-        clave = quote(self.postgres_password, safe="")
+        clave = quote(self.postgres_password.get_secret_value(), safe="")
         return (
             f"postgresql+asyncpg://{usuario}:{clave}@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
         )

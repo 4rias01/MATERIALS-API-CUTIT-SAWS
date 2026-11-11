@@ -4,10 +4,10 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Response
 
-from app.business.services.salud_service import SaludService
-from app.core.config import Configuracion
 from app.api.dependencies import obtener_configuracion_app, obtener_salud_service
 from app.api.schemas.salud import SaludRespuesta
+from app.business.services.salud_service import SaludService
+from app.core.config import Configuracion
 
 router = APIRouter(tags=["Monitoreo"])
 

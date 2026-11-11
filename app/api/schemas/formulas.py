@@ -7,6 +7,7 @@ from typing import Annotated, Any, Self
 from pydantic import BeforeValidator, Field, WithJsonSchema
 from pydantic_core import PydanticCustomError
 
+from app.api.schemas.comun import DecimalEntrada, DecimalSalida, EsquemaEntrada, EsquemaSalida
 from app.business.domain.enums import EstadoFormula, ResultadoDictamen, UnidadMedida
 from app.business.services.comandos import (
     ActualizarFormulaComando,
@@ -16,7 +17,6 @@ from app.business.services.comandos import (
 )
 from app.core.config import obtener_configuracion
 from app.core.paginacion import Pagina
-from app.api.schemas.comun import DecimalEntrada, DecimalSalida, EsquemaEntrada, EsquemaSalida
 
 # ---------------------------------------------------------------------------------------
 # Tipos auxiliares
