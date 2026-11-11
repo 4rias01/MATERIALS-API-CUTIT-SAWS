@@ -1,7 +1,6 @@
 # Pipeline de la célula Materiales y Fórmulas (DAS, restricción "Integración y despliegue continuos").
 #
-# Pull Request hacia main ......... build + pruebas + análisis SonarCloud con quality gate.
-# Push a main (PR aprobado y fusionado)
+# Pull Request hacia main/develop . build + pruebas + análisis SonarCloud con quality gate.
 #   1. integracion ................ build + pruebas + SonarCloud; falla si no se aprueba el quality gate.
 #   2. imagen ..................... construye la imagen Docker y la publica en GHCR.
 #   3. despliegue ................. copia docker-compose.yml y monitoring/ a la EC2 por SSH,
@@ -9,6 +8,9 @@
 #
 # Secretos (Settings > Secrets and variables > Actions):
 #   SONAR_TOKEN     token del proyecto en SonarCloud
+#   ENV_CI          contenido completo del .env de pruebas (ver .env.example). Debe definir
+#                   POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_PUERTO_HOST y
+#                   GRAFANA_ADMIN_PASSWORD (docker compose valida todo el archivo).
 #   EC2_HOST        IP o DNS público de la EC2
 #   EC2_USUARIO     usuario SSH de la EC2 (por ejemplo, ubuntu o ec2-user)
 #   EC2_LLAVE_SSH   llave privada SSH (contenido del archivo .pem)
@@ -18,10 +20,7 @@ name: CI/CD
 
 on:
   pull_request:
-    branches: [main]
-  push:
-    branches: [main]
-  workflow_dispatch:
+    branches: [develop]
 
 permissions:
   contents: read
@@ -37,26 +36,24 @@ jobs:
   integracion:
     name: Build, pruebas y SonarCloud
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_DB: materiales_formulas_test
-          POSTGRES_USER: materiales
-          POSTGRES_PASSWORD: materiales
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U materiales -d materiales_formulas_test"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-    env:
-      TEST_DATABASE_URL: postgresql+asyncpg://materiales:materiales@localhost:5432/materiales_formulas_test
     steps:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0 # SonarCloud usa el historial para asignar cada problema a su cambio
+
+      # PostgreSQL se configura en docker-compose.yml (+ override); aquí solo se crea el .env.
+      - name: Crear .env desde el secreto ENV_CI
+        env:
+          ENV_CI: ${{ secrets.ENV_CI }}
+        run: |
+          test -n "$ENV_CI" || { echo "Falta el secreto ENV_CI"; exit 1; }
+          printf '%s\n' "$ENV_CI" > .env
+          set -a; . ./.env; set +a
+          echo "::add-mask::$POSTGRES_PASSWORD"
+          echo "TEST_DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@127.0.0.1:${POSTGRES_PUERTO_HOST}/${POSTGRES_DB}" >> "$GITHUB_ENV"
+
+      - name: Levantar PostgreSQL (docker compose)
+        run: docker compose up -d --wait postgres
 
       - uses: actions/setup-python@v6
         with:
@@ -82,7 +79,6 @@ jobs:
   imagen:
     name: Publicar imagen en GHCR
     needs: integracion
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: read
