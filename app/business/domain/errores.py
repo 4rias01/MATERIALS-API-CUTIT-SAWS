@@ -1,8 +1,8 @@
 """Errores del dominio.
 
-No tienen código HTTP ni mensaje para el cliente: el servicio que los captura decide
-qué mensaje del backlog devolver (por ejemplo, una ``TransicionNoPermitidaError`` al
-descontinuar se responde con ``mensajes.HU08_C5``).
+No tienen código HTTP ni mensaje para el cliente: el schema o el servicio que los
+captura decide qué mensaje del backlog devolver (por ejemplo, una ``ValorInvalidoError``
+del nombre con motivo LONGITUD se responde con ``mensajes.HU01_C2_2_A``).
 """
 
 from enum import StrEnum
@@ -31,12 +31,3 @@ class ValorInvalidoError(ErrorDominio):
         self.campo = campo
         self.motivo = motivo
         self.valor = valor
-
-
-class TransicionNoPermitidaError(ErrorDominio):
-    """La fórmula no admite la acción en su estado actual (patrón State)."""
-
-    def __init__(self, estado_actual: str, accion: str) -> None:
-        super().__init__(f"La acción '{accion}' no está permitida en el estado {estado_actual}")
-        self.estado_actual = estado_actual
-        self.accion = accion

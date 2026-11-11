@@ -6,9 +6,10 @@ motivo, y el servicio o el schema decide qué mensaje del backlog devolver.
 
 Interpretaciones que el equipo debe confirmar con el PO (ver README, "Vacíos del backlog"):
 
-* "máximo N caracteres" en Densidad y Pureza se cuenta sobre el número escrito sin
-  ceros sobrantes ni notación científica (7.850 → "7.85" → 4 caracteres).
-* Los identificadores usan mínimo 3 dígitos (mat-001 … mat-999, mat-1000).
+* "máximo N caracteres" en Densidad y Pureza cuenta dígitos y punto decimal del número
+  escrito sin ceros a la derecha del decimal ni notación científica (7.850 → "7.85" → 4
+  caracteres), como precisa HU-01 c1.
+* El ID del material usa mínimo 3 dígitos (mat-001 … mat-999, mat-1000).
 """
 
 import re
@@ -26,7 +27,7 @@ _ESPACIOS_REPETIDOS = re.compile(r" {2,}")
 
 
 def normalizar_nombre(texto: str) -> str:
-    """Quita los espacios al inicio y al final y reduce a uno los repetidos (HU-01 c1, HU-03 c1)."""
+    """Quita los espacios al inicio y al final y reduce a uno los repetidos (HU-01 c1)."""
     return _ESPACIOS_REPETIDOS.sub(" ", texto.strip())
 
 
@@ -46,12 +47,6 @@ def a_decimal(valor: object, campo: str) -> Decimal:
 def contar_caracteres(numero: Decimal) -> int:
     """Caracteres del número sin ceros sobrantes ni notación científica (7.850 → "7.85" → 4)."""
     return len(format(numero.normalize(), "f"))
-
-
-def contar_digitos(numero: Decimal) -> tuple[int, int]:
-    """Dígitos enteros y decimales del valor absoluto, sin ceros sobrantes."""
-    enteros, _, decimales = format(abs(numero).normalize(), "f").partition(".")
-    return len(enteros), len(decimales)
 
 
 # ---------------------------------------------------------------------------------------
@@ -95,7 +90,7 @@ class NombreMaterial:
 
 @dataclass(frozen=True, slots=True)
 class Densidad:
-    """Densidad del material: numérica, positiva y de máximo 4 caracteres (HU-01 c1)."""
+    """Densidad del material: numérica, positiva y de máximo 4 caracteres (HU-01 c1, p. ej. 7.85 o 1000)."""
 
     valor: Decimal
 
@@ -144,73 +139,12 @@ class Sku:
 
 
 # ---------------------------------------------------------------------------------------
-# Fórmula
+# Identificador secuencial (el número sale de una secuencia de PostgreSQL)
 # ---------------------------------------------------------------------------------------
-
-
-@dataclass(frozen=True, slots=True)
-class Cantidad:
-    """Cantidad de un material en una fórmula: mayor que 0, máximo 6 dígitos enteros y
-    3 decimales (HU-05 c1). Si la unidad es und debe ser entera (ver
-    ``specifications.CantidadEnteraSiUnidad``)."""
-
-    valor: Decimal
-
-    MAX_ENTEROS: ClassVar[int] = 6
-    MAX_DECIMALES: ClassVar[int] = 3
-
-    def __post_init__(self) -> None:
-        numero = a_decimal(self.valor, "cantidad")
-        object.__setattr__(self, "valor", numero)
-        if numero <= 0:
-            raise ValorInvalidoError("cantidad", Motivo.NO_POSITIVO, numero)
-        enteros, decimales = contar_digitos(numero)
-        if enteros > self.MAX_ENTEROS or decimales > self.MAX_DECIMALES:
-            raise ValorInvalidoError("cantidad", Motivo.DEMASIADOS_DIGITOS, numero)
-
-    def es_entera(self) -> bool:
-        return self.valor == self.valor.to_integral_value()
-
-
-@dataclass(frozen=True, slots=True)
-class Version:
-    """Versión de la fórmula: empieza en 1 y aumenta en 1 con cada modificación (HU-05 c7.3)."""
-
-    valor: int = 1
-
-    def __post_init__(self) -> None:
-        if isinstance(self.valor, bool) or not isinstance(self.valor, int) or self.valor < 1:
-            raise ValorInvalidoError("version", Motivo.FUERA_DE_RANGO, self.valor)
-
-    def siguiente(self) -> "Version":
-        return Version(self.valor + 1)
-
-
-# ---------------------------------------------------------------------------------------
-# Identificadores secuenciales (los números salen de secuencias de PostgreSQL)
-# ---------------------------------------------------------------------------------------
-
-PATRON_ID_MATERIAL = r"^mat-\d{3,}$"
-PATRON_ID_FORMULA = r"^form-\d{3,}$"
-PATRON_TICKET_EVALUACION = r"^tck-\d{3,}$"
-
-
-def _identificador(prefijo: str, numero: int) -> str:
-    if numero < 1:
-        raise ValorInvalidoError(prefijo, Motivo.FUERA_DE_RANGO, numero)
-    return f"{prefijo}-{numero:03d}"
 
 
 def id_material(numero: int) -> str:
     """ID del material con formato secuencial mat-NNN (HU-01 c7.1)."""
-    return _identificador("mat", numero)
-
-
-def id_formula(numero: int) -> str:
-    """Código de la fórmula con formato secuencial form-NNN (HU-05 c7.1)."""
-    return _identificador("form", numero)
-
-
-def id_ticket_evaluacion(numero: int) -> str:
-    """ticketEvaluacionId con formato tck-NNN (HU-09 c1)."""
-    return _identificador("tck", numero)
+    if numero < 1:
+        raise ValorInvalidoError("mat", Motivo.FUERA_DE_RANGO, numero)
+    return f"mat-{numero:03d}"

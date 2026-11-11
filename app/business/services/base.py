@@ -7,7 +7,7 @@ punto donde se confirma o se revierte la transacción. El decorador
 * ``ErrorBaseDatos`` (fallo de conexión, de persistencia o timeout > 5 s): la unidad de
   trabajo ya revirtió; se responde ``ErrorInterno`` (500 con traceId) con el mensaje
   del backlog para ese caso de uso.
-* ``ErrorServicioExterno`` (Inventario o Patent Sweep no responde, falla o tarda > 5 s):
+* ``ErrorServicioExterno`` (Inventario no responde, falla o tarda > 5 s):
   se responde ``DependenciaNoDisponibleError`` (503) con el mensaje del caso de uso.
 * Cualquier otro ``ErrorAplicacion`` (400, 404, 409, 422, 503): se registra en la tabla
   de auditoría en una transacción propia y se propaga.
@@ -22,7 +22,7 @@ import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any, Generic, TypeVar
+from typing import Any, TypeVar
 
 from app.core.contexto import nuevo_trace_id, obtener_origen, obtener_trace_id
 from app.core.events import BusEventos, EventoDominio
@@ -34,8 +34,8 @@ from app.core.exceptions import (
     ErrorServicioExterno,
     NoImplementadoError,
 )
-from app.data_access.interfaces import IAuditoriaRepository, IUnitOfWork
-from app.data_access.models import Auditoria
+from app.infraestructure.interfaces import IAuditoriaRepository, IUnitOfWork
+from app.infraestructure.models import Auditoria
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +47,7 @@ _LONGITUD_ORIGEN = 100
 
 
 @dataclass(frozen=True, slots=True)
-class Resultado(Generic[T]):
+class Resultado[T]:
     """Lo que devuelve un caso de uso: los datos y, si el backlog lo define, el mensaje."""
 
     datos: T
@@ -162,7 +162,7 @@ def operacion_de_negocio(
 
 
 def _con_trace_id(mensaje: str) -> str:
-    """Reemplaza el marcador [traceId] de los mensajes que lo incluyen (por ejemplo HU02_C5)."""
+    """Reemplaza el marcador [traceId] de los mensajes que lo incluyen."""
     if "[traceId]" not in mensaje:
         return mensaje
     return mensaje.replace("[traceId]", obtener_trace_id() or nuevo_trace_id())

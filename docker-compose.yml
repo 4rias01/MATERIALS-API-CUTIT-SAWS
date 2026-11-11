@@ -1,23 +1,36 @@
 # Despliegue de la célula Materiales y Fórmulas en su EC2 (vista de despliegue del DAS).
 # Cada proceso corre en su propio contenedor, en la red interna "interna":
-#   api (8000) · postgres (solo red interna) · prometheus (9090, solo localhost)
-#   grafana (3000) · node-exporter (9100, solo red interna)
+#   api (API_PUERTO_HOST del .env) · postgres (solo red interna) · prometheus (9090, solo localhost)
+#   grafana (3820, solo localhost) · node-exporter (9100, solo red interna)
 #
-# El pipeline copia este archivo y la carpeta monitoring/ a la EC2. Las variables se
-# leen del archivo .env que se crea una sola vez en la EC2 (ver .env.example).
+# Configuración:
+#   - Secretos y valores propios del entorno: archivo .env (ver .env.example).
+#   - API_IMAGEN y API_TAG: las exporta el pipeline en cada despliegue.
+#   - Lo demás tiene valores por defecto en app/core/config.py.
+# Cada contenedor recibe solo las variables que necesita (sin env_file).
 # En desarrollo, docker-compose.override.yml se aplica automáticamente.
 name: materiales-formulas
+
+x-postgres-credenciales: &postgres-credenciales
+  POSTGRES_DB: ${POSTGRES_DB}
+  POSTGRES_USER: ${POSTGRES_USER}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
 
 services:
   api:
     image: ${API_IMAGEN:-materiales-formulas-api}:${API_TAG:-latest}
     container_name: materiales-api
-    env_file: .env
     environment:
+      <<: *postgres-credenciales
       POSTGRES_HOST: postgres
       POSTGRES_PORT: "5432"
+      ENTORNO: produccion
+      INVENTARIO_URL: ${INVENTARIO_URL:-}
+      PATENT_SWEEP_URL: ${PATENT_SWEEP_URL:-}
+      PATENT_SWEEP_RUTA_EVALUACION: ${PATENT_SWEEP_RUTA_EVALUACION:-}
+    # Puerto del host definido en el .env; dentro de la red interna la API escucha en 8000.
     ports:
-      - "8000:8000"
+      - "${API_PUERTO_HOST}:8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -32,10 +45,7 @@ services:
   postgres:
     image: postgres:16
     container_name: materiales-postgres
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:-materiales_formulas}
-      POSTGRES_USER: ${POSTGRES_USER:-materiales}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD en el archivo .env}
+    environment: *postgres-credenciales
     # Sin "ports": solo la API la alcanza, por la red interna de Docker.
     volumes:
       - pgdata:/var/lib/postgresql/data
@@ -76,8 +86,8 @@ services:
     image: grafana/grafana:13.1.0
     container_name: materiales-grafana
     environment:
-      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Defina GRAFANA_ADMIN_PASSWORD en el archivo .env}
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
       GF_USERS_ALLOW_SIGN_UP: "false"
     volumes:
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
