@@ -1,8 +1,8 @@
-"""Esquema inicial del módulo Materiales y Fórmulas (MER del DAS).
+"""Esquema inicial del módulo Materiales y Fórmulas (sprint 0: flujo de ejemplo HU-01).
 
-Tablas material, formula, componente_formula, evaluacion_patente, patente_conflicto y
-auditoria; secuencias de los consecutivos mat-NNN, form-NNN y tck-NNN; restricciones
-PK, FK, UNIQUE, CHECK y NOT NULL; índices de filtro y orden.
+Tablas material y auditoria; secuencia del consecutivo mat-NNN; restricciones PK,
+UNIQUE, CHECK y NOT NULL. Las tablas de las demás historias se agregan con nuevas
+migraciones cuando se implementen.
 
 Revision ID: 0001
 Revises:
@@ -20,7 +20,7 @@ down_revision: str | Sequence[str] | None = None
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
-SECUENCIAS = ("seq_material", "seq_formula", "seq_ticket_evaluacion")
+SECUENCIAS = ("seq_material",)
 
 
 def _ahora() -> sa.TextClause:
@@ -58,86 +58,6 @@ def upgrade() -> None:
     op.create_index("uq_material_nombre_lower", "material", [sa.text("lower(nombre)")], unique=True)
 
     op.create_table(
-        "formula",
-        sa.Column("id_formula", sa.String(10), nullable=False),
-        sa.Column("nombre", sa.String(80), nullable=False),
-        sa.Column("aplicacion_tecnica", sa.String(200), nullable=False),
-        sa.Column("version", sa.Integer(), nullable=False),
-        sa.Column("estado", sa.String(25), nullable=False),
-        sa.Column("fecha_registro", sa.DateTime(timezone=True), server_default=_ahora(), nullable=False),
-        sa.Column("fecha_actualizacion", sa.DateTime(timezone=True), server_default=_ahora(), nullable=False),
-        sa.PrimaryKeyConstraint("id_formula", name=op.f("pk_formula")),
-        sa.CheckConstraint("version >= 1", name=op.f("ck_formula_version_minima")),
-        sa.CheckConstraint(
-            "estado IN ('BORRADOR', 'EVALUANDO_PATENTE', 'APROBADA', 'RECHAZADA_POR_INFRACCION', 'DESCONTINUADA')",
-            name=op.f("ck_formula_estado"),
-        ),
-    )
-    op.create_index("ix_formula_estado", "formula", ["estado"])
-    op.create_index("ix_formula_fecha_actualizacion", "formula", ["fecha_actualizacion"])
-    op.create_index("uq_formula_nombre_lower", "formula", [sa.text("lower(nombre)")], unique=True)
-
-    op.create_table(
-        "componente_formula",
-        sa.Column("id_formula", sa.String(10), nullable=False),
-        sa.Column("id_material", sa.String(10), nullable=False),
-        sa.Column("cantidad", sa.Numeric(9, 3), nullable=False),
-        sa.PrimaryKeyConstraint("id_formula", "id_material", name=op.f("pk_componente_formula")),
-        sa.ForeignKeyConstraint(
-            ["id_formula"],
-            ["formula.id_formula"],
-            name=op.f("fk_componente_formula_id_formula_formula"),
-            ondelete="CASCADE",
-        ),
-        sa.ForeignKeyConstraint(
-            ["id_material"], ["material.id_material"], name=op.f("fk_componente_formula_id_material_material")
-        ),
-        sa.CheckConstraint("cantidad > 0", name=op.f("ck_componente_formula_cantidad_positiva")),
-    )
-    op.create_index("ix_componente_formula_id_material", "componente_formula", ["id_material"])
-
-    op.create_table(
-        "evaluacion_patente",
-        sa.Column("ticket_evaluacion_id", sa.String(10), nullable=False),
-        sa.Column("id_formula", sa.String(10), nullable=False),
-        sa.Column("fecha_solicitud", sa.DateTime(timezone=True), server_default=_ahora(), nullable=False),
-        sa.Column("resultado", sa.String(15), nullable=True),
-        sa.Column("fecha_dictamen", sa.DateTime(timezone=True), nullable=True),
-        sa.PrimaryKeyConstraint("ticket_evaluacion_id", name=op.f("pk_evaluacion_patente")),
-        sa.ForeignKeyConstraint(
-            ["id_formula"], ["formula.id_formula"], name=op.f("fk_evaluacion_patente_id_formula_formula")
-        ),
-        sa.CheckConstraint(
-            "resultado IS NULL OR resultado IN ('SIN_INFRACCION', 'INFRACCION')",
-            name=op.f("ck_evaluacion_patente_resultado"),
-        ),
-    )
-    op.create_index("ix_evaluacion_patente_id_formula", "evaluacion_patente", ["id_formula"])
-    # A lo sumo un trámite abierto (sin dictamen) por fórmula.
-    op.create_index(
-        "uq_evaluacion_patente_abierta",
-        "evaluacion_patente",
-        ["id_formula"],
-        unique=True,
-        postgresql_where=sa.text("resultado IS NULL"),
-    )
-
-    op.create_table(
-        "patente_conflicto",
-        sa.Column("ticket_evaluacion_id", sa.String(10), nullable=False),
-        sa.Column("conflicto_id", sa.CHAR(6), nullable=False),
-        sa.Column("titulo", sa.String(60), nullable=False),
-        sa.PrimaryKeyConstraint("ticket_evaluacion_id", "conflicto_id", name=op.f("pk_patente_conflicto")),
-        sa.ForeignKeyConstraint(
-            ["ticket_evaluacion_id"],
-            ["evaluacion_patente.ticket_evaluacion_id"],
-            name=op.f("fk_patente_conflicto_ticket_evaluacion_id_evaluacion_patente"),
-            ondelete="CASCADE",
-        ),
-        sa.CheckConstraint("conflicto_id ~ '^[0-9]{6}$'", name=op.f("ck_patente_conflicto_conflicto_id_formato")),
-    )
-
-    op.create_table(
         "auditoria",
         sa.Column("id_auditoria", sa.BigInteger(), autoincrement=True, nullable=False),
         sa.Column("fecha_hora", sa.DateTime(timezone=True), server_default=_ahora(), nullable=False),
@@ -156,10 +76,6 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_table("auditoria")
-    op.drop_table("patente_conflicto")
-    op.drop_table("evaluacion_patente")
-    op.drop_table("componente_formula")
-    op.drop_table("formula")
     op.drop_table("material")
     for nombre in reversed(SECUENCIAS):
         op.execute(sa.schema.DropSequence(sa.Sequence(nombre)))

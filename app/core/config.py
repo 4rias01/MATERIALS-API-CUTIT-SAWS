@@ -2,8 +2,8 @@
 
 Toda la configuración se lee de variables de entorno (en desarrollo también de un
 archivo ``.env``) con pydantic-settings. La misma imagen Docker corre en cualquier
-entorno cambiando solo estas variables: URLs de las otras APIs, timeouts, tamaños
-de página y credenciales.
+entorno cambiando solo estas variables: URLs de las otras APIs, timeouts y
+credenciales.
 
 Los valores marcados como POR ACORDAR dependen de las células de Inventario y
 Patent Sweep y deben confirmarse con ellas antes de desplegar.
@@ -51,21 +51,15 @@ class Configuracion(BaseSettings):
     http_timeout_s: float = Field(default=5.0, gt=0)
     # POR ACORDAR con la célula de Inventario: URL base de su API.
     inventario_url: str | None = None
-    # Rutas definidas en el backlog (HU-01 c4 y HU-03 c4).
+    # Ruta definida en el backlog (HU-01 c4).
     inventario_ruta_materias_primas: str = "/inventario/materias-primas"
-    inventario_ruta_articulo: str = "/inventario/articulos/{codigo}"
-    # POR ACORDAR con la célula de Patent Sweep: URL base y ruta de la solicitud de evaluación (HU-09).
+    # POR ACORDAR con la célula de Patent Sweep: URL base y ruta de la solicitud de evaluación
+    # (HU-09). Aún sin uso: se configuran desde ya para el despliegue.
     patent_sweep_url: str | None = None
     patent_sweep_ruta_evaluacion: str | None = None
     # Circuit Breaker de cada cliente: fallos seguidos para abrir y segundos que permanece abierto.
     cb_umbral_fallos: int = Field(default=5, ge=1)
     cb_tiempo_abierto_s: float = Field(default=30.0, gt=0)
-
-    # --- Paginación --------------------------------------------------------------------
-    # HU-06 c2: el listado de fórmulas se presenta en páginas de 10 registros.
-    formulas_tamano_pagina: int = Field(default=10, ge=1)
-    # HU-11 c1: tamaño de página por defecto de GET /formulas/aprobadas (el máximo, 100, es del contrato).
-    aprobadas_tamano_pagina_defecto: int = Field(default=50, ge=1, le=100)
 
     @property
     def url_base_datos(self) -> str:

@@ -343,7 +343,7 @@
     {
       "id": 9,
       "type": "timeseries",
-      "title": "Llamadas a Inventario y Patent Sweep",
+      "title": "Llamadas a Inventario",
       "description": "",
       "datasource": {
         "type": "prometheus",

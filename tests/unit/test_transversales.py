@@ -1,4 +1,4 @@
-"""Utilidades transversales: configuración, logging JSON, eventos y paginación."""
+"""Utilidades transversales: configuración, logging JSON y eventos."""
 
 import json
 import logging
@@ -9,7 +9,6 @@ from app.core.config import Configuracion
 from app.core.contexto import establecer_contexto, restablecer_contexto, trace_id_valido
 from app.core.events import BusEventos, EventoDominio
 from app.core.logging import FormateadorJson
-from app.core.paginacion import Pagina, calcular_desplazamiento
 
 
 def test_url_de_base_de_datos_desde_las_variables_postgres() -> None:
@@ -56,16 +55,6 @@ def test_bus_de_eventos_entrega_a_los_suscriptores_y_aisla_fallos() -> None:
     bus.suscribir(lambda e: todos.append(e.nombre))
     bus.suscribir(lambda e: solo_uno.append(e.nombre), evento="MaterialRegistrado")
     bus.publicar(EventoDominio("MaterialRegistrado", {"materialId": "mat-001"}))
-    bus.publicar(EventoDominio("FormulaRegistrada"))
-    assert todos == ["MaterialRegistrado", "FormulaRegistrada"]
+    bus.publicar(EventoDominio("OtroEvento"))
+    assert todos == ["MaterialRegistrado", "OtroEvento"]
     assert solo_uno == ["MaterialRegistrado"]
-
-
-@pytest.mark.parametrize(("total", "tamano", "paginas"), [(0, 10, 0), (10, 10, 1), (11, 10, 2), (101, 50, 3)])
-def test_total_de_paginas(total: int, tamano: int, paginas: int) -> None:
-    assert Pagina([], 1, tamano, total).total_paginas == paginas
-
-
-def test_desplazamiento() -> None:
-    assert calcular_desplazamiento(1, 10) == 0
-    assert calcular_desplazamiento(3, 50) == 100

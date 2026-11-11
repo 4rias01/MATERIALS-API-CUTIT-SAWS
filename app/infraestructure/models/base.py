@@ -1,4 +1,4 @@
-"""Base declarativa de SQLAlchemy y secuencias de los identificadores."""
+"""Base declarativa de SQLAlchemy y secuencia del identificador del material."""
 
 from sqlalchemy import MetaData, Sequence
 from sqlalchemy.orm import DeclarativeBase
@@ -17,11 +17,9 @@ class Base(DeclarativeBase):
     metadata = MetaData(naming_convention=CONVENCION_NOMBRES)
 
 
-# Secuencias de los consecutivos mat-NNN, form-NNN y tck-NNN. Un número consumido en una
-# transacción que se revierte no se reutiliza (puede haber saltos en la numeración).
+# Secuencia del consecutivo mat-NNN. Un número consumido en una transacción que se
+# revierte no se reutiliza (puede haber saltos en la numeración).
 SECUENCIA_MATERIAL = Sequence("seq_material", metadata=Base.metadata)
-SECUENCIA_FORMULA = Sequence("seq_formula", metadata=Base.metadata)
-SECUENCIA_TICKET_EVALUACION = Sequence("seq_ticket_evaluacion", metadata=Base.metadata)
 
 
 def lista_sql(valores: tuple[str, ...]) -> str:

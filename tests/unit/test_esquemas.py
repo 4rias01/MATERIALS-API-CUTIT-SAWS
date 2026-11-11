@@ -1,6 +1,5 @@
 """Mecanismo de los DTO: traducción de errores al mensaje del backlog y formatos."""
 
-from datetime import date
 from decimal import Decimal
 from typing import Any, ClassVar
 
@@ -14,7 +13,6 @@ from app.api.schemas.comun import (
     EsquemaSalida,
     error_de_negocio,
 )
-from app.api.schemas.formulas import FiltrosFormulasConsulta, PaginacionAprobadasConsulta
 from app.business.domain import mensajes
 
 
@@ -22,7 +20,7 @@ class Ejemplo(EsquemaEntrada):
     mensajes_error: ClassVar[dict[tuple[str, str], str]] = {
         ("nombre", "missing"): mensajes.HU01_C2_1,
         ("categoriaMaterial", "*"): mensajes.HU01_C2_3_B,
-        ("sku", "extra_forbidden"): mensajes.HU03_C2_1,
+        ("sku", "extra_forbidden"): "El campo 'SKU' es de solo lectura",
     }
 
     nombre: str
@@ -54,7 +52,7 @@ def test_comodin_y_marcador_valor() -> None:
 
 def test_campo_de_solo_lectura() -> None:
     error = _error({"nombre": "Acero", "categoriaMaterial": "A", "sku": "MP-00001"})
-    assert error["msg"] == mensajes.HU03_C2_1
+    assert error["msg"] == "El campo 'SKU' es de solo lectura"
 
 
 def test_validador_de_campo_con_mensaje_propio() -> None:
@@ -79,18 +77,3 @@ class Salida(EsquemaSalida):
 @pytest.mark.parametrize(("valor", "json"), [("2.000", '{"valorDecimal":2}'), ("7.850", '{"valorDecimal":7.85}')])
 def test_decimales_se_escriben_como_numeros_json(valor: str, json: str) -> None:
     assert Salida(valor_decimal=Decimal(valor)).model_dump_json() == json
-
-
-def test_fechas_dd_mm_aaaa() -> None:
-    filtros = FiltrosFormulasConsulta.model_validate({"fechaRegistroDesde": "31/01/2026"})
-    assert filtros.fecha_registro_desde == date(2026, 1, 31)
-    with pytest.raises(ValidationError) as error:
-        FiltrosFormulasConsulta.model_validate({"fechaRegistroDesde": "2026-01-31"})
-    assert error.value.errors()[0]["type"] == "fecha_ddmmaaaa"
-
-
-def test_paginacion_de_aprobadas_por_defecto() -> None:
-    parametros = PaginacionAprobadasConsulta.model_validate({})
-    assert (parametros.pagina, parametros.tamano_pagina) == (1, 50)
-    with pytest.raises(ValidationError):
-        PaginacionAprobadasConsulta.model_validate({"tamanoPagina": 101})

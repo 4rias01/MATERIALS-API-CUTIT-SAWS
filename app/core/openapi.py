@@ -9,11 +9,8 @@ if TYPE_CHECKING:
 DESCRIPCION = """
 API REST del módulo **Materiales y Fórmulas** de la plataforma backend de Cutit Saws Ltd.
 
-* **Materiales** (HU-01 a HU-04): registrar, consultar, modificar e inhabilitar.
-* **Fórmulas** (HU-05 a HU-08 y HU-11): registrar, consultar, modificar, descontinuar y
-  listar las aprobadas para Patent Sweep.
-* **Evaluación de patentes** (HU-09 y HU-10): solicitar la verificación legal y recibir
-  el dictamen de Patent Sweep (callback).
+* **Materiales** (HU-01): registrar un material nuevo, que también se registra como
+  materia prima en Inventario.
 
 **Formato de las respuestas**
 
@@ -29,9 +26,7 @@ API REST del módulo **Materiales y Fórmulas** de la plataforma backend de Cuti
 """
 
 ETIQUETAS = [
-    {"name": "Materiales", "description": "Catálogo de materiales (HU-01 a HU-04)."},
-    {"name": "Fórmulas", "description": "Catálogo y ciclo de vida de las fórmulas (HU-05 a HU-08 y HU-11)."},
-    {"name": "Evaluación de patentes", "description": "Integración con Patent Sweep (HU-09 y HU-10)."},
+    {"name": "Materiales", "description": "Catálogo de materiales (HU-01)."},
     {"name": "Monitoreo", "description": "Estado de la API (/health). Las métricas están en /metrics."},
 ]
 
@@ -39,7 +34,7 @@ ETIQUETAS = [
 def ajustar_openapi(app: "FastAPI") -> None:
     """Quita del contrato la respuesta 422 "Validation Error" que FastAPI agrega por
     defecto: esta API responde 400 cuando la solicitud no cumple el contrato y reserva
-    el 422 para las reglas de negocio (HU-05, HU-07 y HU-09)."""
+    el 422 para las reglas de negocio."""
     generar_original = app.openapi
 
     def generar() -> dict[str, Any]:

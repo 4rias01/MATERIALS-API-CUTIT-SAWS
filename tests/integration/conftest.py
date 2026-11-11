@@ -19,8 +19,8 @@ from app.infraestructure.database import crear_fabrica_sesiones
 from tests.conftest import URL_BD_PRUEBAS
 
 RAIZ = Path(__file__).resolve().parents[2]
-TABLAS = "auditoria, patente_conflicto, evaluacion_patente, componente_formula, formula, material"
-SECUENCIAS = ("seq_material", "seq_formula", "seq_ticket_evaluacion")
+TABLAS = "auditoria, material"
+SECUENCIAS = ("seq_material",)
 
 
 def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:

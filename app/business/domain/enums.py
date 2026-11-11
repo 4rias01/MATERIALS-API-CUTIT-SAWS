@@ -1,7 +1,7 @@
 """Valores permitidos del dominio (objetos de valor enumerados).
 
 Las restricciones CHECK de la base de datos repiten estos valores
-(app/data_access/models). La prueba tests/unit/test_modelos_vs_dominio.py verifica
+(app/infraestructure/models). La prueba tests/unit/test_modelos_vs_dominio.py verifica
 que ambas listas coincidan.
 """
 
@@ -28,24 +28,7 @@ class UnidadMedida(StrEnum):
 
 
 class EstadoMaterial(StrEnum):
-    """Estado del material: INACTIVO es el borrado lógico (HU-04)."""
+    """Estado del material: se registra en ACTIVO (HU-01 c7.3)."""
 
     ACTIVO = "ACTIVO"
     INACTIVO = "INACTIVO"
-
-
-class EstadoFormula(StrEnum):
-    """Estados del ciclo de vida de la fórmula (HU-05 c7.2)."""
-
-    BORRADOR = "BORRADOR"
-    EVALUANDO_PATENTE = "EVALUANDO_PATENTE"
-    APROBADA = "APROBADA"
-    RECHAZADA_POR_INFRACCION = "RECHAZADA_POR_INFRACCION"
-    DESCONTINUADA = "DESCONTINUADA"
-
-
-class ResultadoDictamen(StrEnum):
-    """Resultado del dictamen de Patent Sweep (HU-10 c3.2)."""
-
-    SIN_INFRACCION = "SIN_INFRACCION"
-    INFRACCION = "INFRACCION"

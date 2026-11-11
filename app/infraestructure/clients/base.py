@@ -1,6 +1,6 @@
 """Base de los clientes HTTP (patrón Gateway).
 
-Centraliza lo que comparten los clientes de Inventario y Patent Sweep:
+Centraliza lo que comparte todo cliente de otra célula (hoy, Inventario):
 
 * Timeout total de 5 s por llamada (``HTTP_TIMEOUT_S``).
 * Circuit Breaker por servicio.

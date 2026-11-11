@@ -3,7 +3,7 @@
 * Pruebas unitarias (tests/unit): no necesitan base de datos ni APIs externas.
 * Pruebas de integración (tests/integration): usan PostgreSQL. La URL se toma de
   ``TEST_DATABASE_URL``; si la base no responde, se omiten.
-* Criterios de aceptación (tests/hu): uno por criterio del backlog, pendientes de implementar.
+* Criterios de aceptación (tests/hu): una prueba por criterio de cada historia implementada.
 """
 
 import os
@@ -34,8 +34,6 @@ def configuracion_de_prueba(**valores: object) -> Configuracion:
         "database_url": URL_SIN_BASE_DE_DATOS,
         "db_timeout_s": 2.0,
         "inventario_url": "http://inventario.prueba",
-        "patent_sweep_url": "http://patent-sweep.prueba",
-        "patent_sweep_ruta_evaluacion": "/evaluaciones",
     }
     base.update(valores)
     return Configuracion(_env_file=None, **base)  # type: ignore[call-arg]
