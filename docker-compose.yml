@@ -33,8 +33,8 @@ services:
     image: postgres:16
     container_name: materiales-postgres
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-materiales_formulas}
-      POSTGRES_USER: ${POSTGRES_USER:-materiales}
+      POSTGRES_DB: ${POSTGRES_DB:?Defina POSTGRES_DB en el archivo .env}
+      POSTGRES_USER: ${POSTGRES_USER:?Defina POSTGRES_USER en el archivo .env}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD en el archivo .env}
     # Sin "ports": solo la API la alcanza, por la red interna de Docker.
     volumes:
