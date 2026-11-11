@@ -10,7 +10,7 @@ Una especificación responde si un candidato cumple una regla. Se pueden combina
 
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
-from typing import Any, Generic, Protocol, TypeVar
+from typing import Any, Protocol, TypeVar
 
 from app.business.domain.enums import EstadoMaterial, UnidadMedida
 from app.business.domain.value_objects import Cantidad
@@ -18,7 +18,7 @@ from app.business.domain.value_objects import Cantidad
 T = TypeVar("T")
 
 
-class Especificacion(ABC, Generic[T]):
+class Especificacion[T](ABC):
     """Regla de negocio que un candidato cumple o no."""
 
     @abstractmethod

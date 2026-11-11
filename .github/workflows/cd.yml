@@ -1,84 +1,37 @@
-# Pipeline de la célula Materiales y Fórmulas (DAS, restricción "Integración y despliegue continuos").
+# Despliegue continuo de la célula Materiales y Fórmulas (rama main).
 #
-# Pull Request hacia main/develop . build + pruebas + análisis SonarCloud con quality gate.
-#   1. integracion ................ build + pruebas + SonarCloud; falla si no se aprueba el quality gate.
-#   2. imagen ..................... construye la imagen Docker y la publica en GHCR.
-#   3. despliegue ................. copia docker-compose.yml y monitoring/ a la EC2 por SSH,
-#                                   descarga la imagen y reinicia los contenedores.
+# Corre en cada push a main (al fusionar develop en main) o a mano desde la pestaña Actions.
+# El código ya pasó la integración continua en develop (ci.yml).
+#   1. imagen ....... construye la imagen Docker y la publica en GHCR (:<commit> y :latest).
+#   2. despliegue ... copia docker-compose.yml y monitoring/ a la EC2 por SSH, descarga la
+#                     imagen, reinicia los contenedores y verifica /health.
 #
 # Secretos (Settings > Secrets and variables > Actions):
-#   SONAR_TOKEN     token del proyecto en SonarCloud
-#   ENV_CI          contenido completo del .env de pruebas (ver .env.example). Debe definir
-#                   POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_PUERTO_HOST y
-#                   GRAFANA_ADMIN_PASSWORD (docker compose valida todo el archivo).
 #   EC2_HOST        IP o DNS público de la EC2
 #   EC2_USUARIO     usuario SSH de la EC2 (por ejemplo, ubuntu o ec2-user)
 #   EC2_LLAVE_SSH   llave privada SSH (contenido del archivo .pem)
 # Variable opcional: EC2_DIRECTORIO (carpeta del despliegue en la EC2; por defecto materiales-formulas).
 
-name: CI/CD
+name: CD
 
 on:
   pull_request:
-    branches: [develop]
+    branches: [main]
 
 permissions:
   contents: read
 
+# Un despliegue a la vez; uno nuevo espera a que termine el anterior.
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: despliegue-produccion
+  cancel-in-progress: false
 
 env:
   NOMBRE_IMAGEN: materiales-formulas-api
 
 jobs:
-  integracion:
-    name: Build, pruebas y SonarCloud
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0 # SonarCloud usa el historial para asignar cada problema a su cambio
-
-      # PostgreSQL se configura en docker-compose.yml (+ override); aquí solo se crea el .env.
-      - name: Crear .env desde el secreto ENV_CI
-        env:
-          ENV_CI: ${{ secrets.ENV_CI }}
-        run: |
-          test -n "$ENV_CI" || { echo "Falta el secreto ENV_CI"; exit 1; }
-          printf '%s\n' "$ENV_CI" > .env
-          set -a; . ./.env; set +a
-          echo "::add-mask::$POSTGRES_PASSWORD"
-          echo "TEST_DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@127.0.0.1:${POSTGRES_PUERTO_HOST}/${POSTGRES_DB}" >> "$GITHUB_ENV"
-
-      - name: Levantar PostgreSQL (docker compose)
-        run: docker compose up -d --wait postgres
-
-      - uses: actions/setup-python@v6
-        with:
-          python-version: "3.12"
-          cache: pip
-          cache-dependency-path: requirements*.txt
-
-      - name: Build
-        run: |
-          pip install -r requirements-dev.txt
-          python -m compileall -q app migrations
-
-      - name: Pruebas unitarias y de integración (con cobertura)
-        run: pytest --cov --cov-report=xml --cov-report=term --junitxml=reporte-pruebas.xml
-
-      - name: Análisis estático y quality gate (SonarCloud)
-        uses: SonarSource/sonarqube-scan-action@v8
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        # sonar-project.properties tiene sonar.qualitygate.wait=true: si el quality gate no
-        # se aprueba, este paso falla y no se publica ni se despliega la imagen.
-
   imagen:
     name: Publicar imagen en GHCR
-    needs: integracion
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -119,9 +72,6 @@ jobs:
     needs: imagen
     runs-on: ubuntu-latest
     environment: produccion
-    concurrency:
-      group: despliegue-produccion
-      cancel-in-progress: false
     permissions:
       contents: read
       packages: read
@@ -169,9 +119,12 @@ jobs:
 
       - name: Verificar /health
         run: |
-          ssh -i ~/.ssh/ec2 "$EC2_USUARIO@$EC2_HOST" bash -s <<'EOF'
+          ssh -i ~/.ssh/ec2 "$EC2_USUARIO@$EC2_HOST" bash -s -- "$DIRECTORIO" <<'EOF'
+          cd "$1"
+          # Puerto publicado según el .env de la EC2 (API_PUERTO_HOST).
+          url="http://$(docker compose port api 8000)/health"
           for intento in $(seq 1 30); do
-            if curl -fsS http://localhost:8000/health; then exit 0; fi
+            if curl -fsS "$url"; then exit 0; fi
             sleep 5
           done
           echo "La API no respondió 200 en /health"

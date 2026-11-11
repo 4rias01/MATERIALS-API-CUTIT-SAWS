@@ -7,7 +7,6 @@ from typing import Any, ClassVar
 import pytest
 from pydantic import Field, ValidationError, field_validator
 
-from app.business.domain import mensajes
 from app.api.schemas.comun import (
     TIPO_ERROR_NEGOCIO,
     DecimalSalida,
@@ -16,6 +15,7 @@ from app.api.schemas.comun import (
     error_de_negocio,
 )
 from app.api.schemas.formulas import FiltrosFormulasConsulta, PaginacionAprobadasConsulta
+from app.business.domain import mensajes
 
 
 class Ejemplo(EsquemaEntrada):

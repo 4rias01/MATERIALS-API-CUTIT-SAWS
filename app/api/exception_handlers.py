@@ -18,11 +18,11 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from app.api.middleware import CABECERA_TRACE_ID
+from app.api.schemas.comun import CLAVE_MENSAJE_SOLICITUD_INVALIDA, TIPO_ERROR_NEGOCIO, ErrorRespuesta
 from app.business.domain import mensajes
 from app.core.contexto import nuevo_trace_id, obtener_trace_id
 from app.core.exceptions import ErrorAplicacion, NoImplementadoError
-from app.api.middleware import CABECERA_TRACE_ID
-from app.api.schemas.comun import CLAVE_MENSAJE_SOLICITUD_INVALIDA, TIPO_ERROR_NEGOCIO, ErrorRespuesta
 
 logger = logging.getLogger("app.errores")
 

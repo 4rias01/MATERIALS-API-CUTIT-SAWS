@@ -1,6 +1,6 @@
-# Solo para desarrollo local: "docker compose up --build" combina este archivo con
+# Solo para desarrollo local y el CI: "docker compose up" combina este archivo con
 # docker-compose.yml. Construye la imagen desde el código y publica PostgreSQL en
-# localhost (puerto POSTGRES_PUERTO_HOST del .env) para el IDE, las pruebas y el CI.
+# localhost, en el puerto POSTGRES_PUERTO_HOST.
 # El pipeline no copia este archivo a la EC2: en producción PostgreSQL no publica puertos.
 services:
   api:
@@ -11,4 +11,4 @@ services:
 
   postgres:
     ports:
-      - "127.0.0.1:${POSTGRES_PUERTO_HOST:?Defina POSTGRES_PUERTO_HOST en el archivo .env}:5432"
+      - "127.0.0.1:${POSTGRES_PUERTO_HOST}:5432"

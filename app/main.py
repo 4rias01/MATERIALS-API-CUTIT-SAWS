@@ -20,6 +20,9 @@ from contextlib import asynccontextmanager
 import httpx
 from fastapi import FastAPI
 
+from app.api.exception_handlers import registrar_manejadores
+from app.api.middleware import TraceIdMiddleware
+from app.api.routers import evaluacion_patente, formulas, health, materiales
 from app.core.config import Configuracion, obtener_configuracion
 from app.core.events import BusEventos, registrar_evento_en_log
 from app.core.logging import configurar_logging
@@ -29,9 +32,6 @@ from app.infraestructure.clients import CircuitBreaker, InventarioClient, Patent
 from app.infraestructure.clients.inventario_client import SERVICIO as SERVICIO_INVENTARIO
 from app.infraestructure.clients.patent_sweep_client import SERVICIO as SERVICIO_PATENT_SWEEP
 from app.infraestructure.database import crear_fabrica_sesiones, crear_motor
-from app.api.exception_handlers import registrar_manejadores
-from app.api.middleware import TraceIdMiddleware
-from app.api.routers import evaluacion_patente, formulas, health, materiales
 
 logger = logging.getLogger("app")
 

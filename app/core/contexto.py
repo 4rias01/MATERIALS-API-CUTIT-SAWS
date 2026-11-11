@@ -9,6 +9,7 @@ Inventario y a Patent Sweep.
 import re
 import uuid
 from contextvars import ContextVar, Token
+from typing import TypeGuard
 
 _trace_id: ContextVar[str | None] = ContextVar("trace_id", default=None)
 _origen: ContextVar[str | None] = ContextVar("origen", default=None)
@@ -23,9 +24,9 @@ def nuevo_trace_id() -> str:
     return uuid.uuid4().hex
 
 
-def trace_id_valido(valor: str | None) -> bool:
+def trace_id_valido(valor: str | None) -> TypeGuard[str]:
     """Indica si un traceId recibido en una cabecera puede reutilizarse."""
-    return bool(valor) and _PATRON_TRACE_ID.fullmatch(valor) is not None
+    return valor is not None and _PATRON_TRACE_ID.fullmatch(valor) is not None
 
 
 def obtener_trace_id() -> str | None:
