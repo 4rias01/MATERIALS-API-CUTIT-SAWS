@@ -1,0 +1,133 @@
+# Despliegue continuo de la célula Materiales y Fórmulas (rama main).
+#
+# Corre en cada push a main (al fusionar develop en main) o a mano desde la pestaña Actions.
+# El código ya pasó la integración continua en develop (ci.yml).
+#   1. imagen ....... construye la imagen Docker y la publica en GHCR (:<commit> y :latest).
+#   2. despliegue ... copia docker-compose.yml y monitoring/ a la EC2 por SSH, descarga la
+#                     imagen, reinicia los contenedores y verifica /health.
+#
+# Secretos (Settings > Secrets and variables > Actions):
+#   EC2_HOST        IP o DNS público de la EC2
+#   EC2_USUARIO     usuario SSH de la EC2 (por ejemplo, ubuntu o ec2-user)
+#   EC2_LLAVE_SSH   llave privada SSH (contenido del archivo .pem)
+# Variable opcional: EC2_DIRECTORIO (carpeta del despliegue en la EC2; por defecto materiales-formulas).
+
+name: CD
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Un despliegue a la vez; uno nuevo espera a que termine el anterior.
+concurrency:
+  group: despliegue-produccion
+  cancel-in-progress: false
+
+env:
+  NOMBRE_IMAGEN: materiales-formulas-api
+
+jobs:
+  imagen:
+    name: Publicar imagen en GHCR
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      imagen: ${{ steps.nombre.outputs.imagen }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Nombre de la imagen (GHCR exige minúsculas)
+        id: nombre
+        run: echo "imagen=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/${NOMBRE_IMAGEN}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ steps.nombre.outputs.imagen }}:${{ github.sha }}
+            ${{ steps.nombre.outputs.imagen }}:latest
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.title=${{ env.NOMBRE_IMAGEN }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  despliegue:
+    name: Desplegar en AWS EC2
+    needs: imagen
+    runs-on: ubuntu-latest
+    environment: produccion
+    permissions:
+      contents: read
+      packages: read
+    env:
+      EC2_HOST: ${{ secrets.EC2_HOST }}
+      EC2_USUARIO: ${{ secrets.EC2_USUARIO }}
+      DIRECTORIO: ${{ vars.EC2_DIRECTORIO || 'materiales-formulas' }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Configurar SSH
+        env:
+          EC2_LLAVE_SSH: ${{ secrets.EC2_LLAVE_SSH }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$EC2_LLAVE_SSH" > ~/.ssh/ec2
+          chmod 600 ~/.ssh/ec2
+          ssh-keyscan -H "$EC2_HOST" >> ~/.ssh/known_hosts
+
+      - name: Copiar docker-compose.yml y monitoring/
+        run: |
+          ssh -i ~/.ssh/ec2 "$EC2_USUARIO@$EC2_HOST" "mkdir -p '$DIRECTORIO'"
+          scp -i ~/.ssh/ec2 -r docker-compose.yml monitoring "$EC2_USUARIO@$EC2_HOST:$DIRECTORIO/"
+
+      - name: Descargar la imagen y reiniciar los contenedores
+        env:
+          IMAGEN: ${{ needs.imagen.outputs.imagen }}
+          TAG: ${{ github.sha }}
+          GHCR_USUARIO: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # El token de GHCR viaja por la entrada estándar (no queda en la línea de comandos).
+          printf '%s' "$GHCR_TOKEN" | ssh -i ~/.ssh/ec2 "$EC2_USUARIO@$EC2_HOST" \
+            "docker login ghcr.io -u '$GHCR_USUARIO' --password-stdin"
+          ssh -i ~/.ssh/ec2 "$EC2_USUARIO@$EC2_HOST" bash -s -- "$DIRECTORIO" "$IMAGEN" "$TAG" <<'EOF'
+          set -euo pipefail
+          cd "$1"
+          test -f .env || { echo "Falta el archivo .env en $1 (ver .env.example)"; exit 1; }
+          export API_IMAGEN="$2" API_TAG="$3"
+          docker compose pull api
+          docker compose up -d --remove-orphans
+          docker logout ghcr.io
+          docker image prune -f
+          EOF
+
+      - name: Verificar /health
+        run: |
+          ssh -i ~/.ssh/ec2 "$EC2_USUARIO@$EC2_HOST" bash -s -- "$DIRECTORIO" <<'EOF'
+          cd "$1"
+          # Puerto publicado según el .env de la EC2 (API_PUERTO_HOST).
+          url="http://$(docker compose port api 8000)/health"
+          for intento in $(seq 1 30); do
+            if curl -fsS "$url"; then exit 0; fi
+            sleep 5
+          done
+          echo "La API no respondió 200 en /health"
+          exit 1
+          EOF

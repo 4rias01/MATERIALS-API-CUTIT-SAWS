@@ -3,7 +3,7 @@
 * Pruebas unitarias (tests/unit): no necesitan base de datos ni APIs externas.
 * Pruebas de integración (tests/integration): usan PostgreSQL. La URL se toma de
   ``TEST_DATABASE_URL``; si la base no responde, se omiten.
-* Criterios de aceptación (tests/hu): uno por criterio del backlog, pendientes de implementar.
+* Criterios de aceptación (tests/hu): una prueba por criterio de cada historia implementada.
 """
 
 import os
@@ -12,18 +12,18 @@ from collections.abc import AsyncIterator
 os.environ.setdefault("ENTORNO", "pruebas")
 os.environ.setdefault("LOG_NIVEL", "WARNING")
 
-import httpx  # noqa: E402
-import pytest  # noqa: E402
-from fastapi import FastAPI  # noqa: E402
+import httpx
+import pytest
+from fastapi import FastAPI
 
-from app.core.config import Configuracion  # noqa: E402
-from app.main import crear_app  # noqa: E402
+from app.core.config import Configuracion
+from app.main import crear_app
 
 # Base de datos inexistente: la conexión se rechaza de inmediato (puerto 9).
 URL_SIN_BASE_DE_DATOS = "postgresql+asyncpg://nadie:nadie@127.0.0.1:9/ninguna"
-URL_BD_PRUEBAS = os.environ.get(
-    "TEST_DATABASE_URL", "postgresql+asyncpg://materiales:materiales@127.0.0.1:5432/materiales_formulas_test"
-)
+# Sin valor por defecto (no se guardan credenciales en el repositorio): si no está definida,
+# las pruebas de integración se omiten.
+URL_BD_PRUEBAS = os.environ.get("TEST_DATABASE_URL", "")
 
 
 def configuracion_de_prueba(**valores: object) -> Configuracion:
@@ -34,8 +34,6 @@ def configuracion_de_prueba(**valores: object) -> Configuracion:
         "database_url": URL_SIN_BASE_DE_DATOS,
         "db_timeout_s": 2.0,
         "inventario_url": "http://inventario.prueba",
-        "patent_sweep_url": "http://patent-sweep.prueba",
-        "patent_sweep_ruta_evaluacion": "/evaluaciones",
     }
     base.update(valores)
     return Configuracion(_env_file=None, **base)  # type: ignore[call-arg]

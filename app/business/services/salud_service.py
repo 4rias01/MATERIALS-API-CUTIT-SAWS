@@ -4,7 +4,7 @@ import logging
 from dataclasses import dataclass, field
 
 from app.core.exceptions import ErrorBaseDatos
-from app.data_access.interfaces import IInventarioClient, IPatentSweepClient, IUnitOfWork
+from app.infraestructure.interfaces import IInventarioClient, IUnitOfWork
 
 logger = logging.getLogger(__name__)
 
@@ -16,16 +16,15 @@ class EstadoSalud:
 
     @property
     def saludable(self) -> bool:
-        """La API está sana si alcanza su base de datos. Las APIs de otras células no
-        cuentan: si fallan, la API sigue en pie y responde 503 solo en esas operaciones."""
+        """La API está sana si alcanza su base de datos. La API de Inventario no cuenta: si
+        falla, la API sigue en pie y responde 503 solo en las operaciones que la usan."""
         return self.base_datos_disponible
 
 
 class SaludService:
-    def __init__(self, uow: IUnitOfWork, inventario: IInventarioClient, patent_sweep: IPatentSweepClient) -> None:
+    def __init__(self, uow: IUnitOfWork, inventario: IInventarioClient) -> None:
         self._uow = uow
         self._inventario = inventario
-        self._patent_sweep = patent_sweep
 
     async def verificar(self) -> EstadoSalud:
         try:
@@ -36,8 +35,5 @@ class SaludService:
             disponible = False
         return EstadoSalud(
             base_datos_disponible=disponible,
-            circuitos={
-                "inventario": self._inventario.estado_circuito(),
-                "patentSweep": self._patent_sweep.estado_circuito(),
-            },
+            circuitos={"inventario": self._inventario.estado_circuito()},
         )

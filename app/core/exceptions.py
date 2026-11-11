@@ -5,7 +5,7 @@ Hay dos familias:
 * ``ErrorAplicacion`` y sus subclases: resultados que se devuelven al cliente. Llevan
   el mensaje del backlog y el código HTTP que les corresponde. Las lanza la capa de
   lógica de negocio y el manejador global de excepciones
-  (app/presentation/exception_handlers.py) las traduce a la respuesta
+  (app/api/exception_handlers.py) las traduce a la respuesta
   ``{"mensaje": ..., "traceId": ...}``.
 * ``ErrorTecnico`` y sus subclases: fallos de una dependencia (base de datos o API
   externa). Las lanza la capa de acceso a datos, no tienen mensaje para el cliente y
@@ -70,7 +70,7 @@ class NoImplementadoError(ErrorAplicacion):
 
 
 class DependenciaNoDisponibleError(ErrorAplicacion):
-    """503: Inventario o Patent Sweep no respondió, falló o tardó más de 5 s."""
+    """503: la API de otra célula (Inventario) no respondió, falló o tardó más de 5 s."""
 
     codigo_http = 503
 
@@ -97,7 +97,7 @@ class ErrorIntegridadDatos(ErrorBaseDatos):
 
 
 class ErrorServicioExterno(ErrorTecnico):
-    """Fallo al llamar a una API externa (Inventario o Patent Sweep)."""
+    """Fallo al llamar a la API de otra célula (Inventario)."""
 
     # Valores posibles de ``causa``.
     TIMEOUT = "TIMEOUT"

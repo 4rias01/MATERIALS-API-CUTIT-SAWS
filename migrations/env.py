@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.pool import NullPool
 
 from app.core.config import obtener_configuracion
-from app.data_access.models import Base
+from app.infraestructure.models import Base
 
 config = context.config
 if config.config_file_name is not None:
