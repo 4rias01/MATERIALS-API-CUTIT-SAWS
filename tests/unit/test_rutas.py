@@ -11,11 +11,11 @@ import httpx
 import pytest
 from fastapi import FastAPI
 
+from app.api import dependencies
 from app.business.services.base import Resultado
 from app.business.services.comandos import ConsultaFormulas, RegistrarMaterialComando
 from app.business.services.evaluacion_patente_service import TramiteEvaluacion
 from app.core.paginacion import Pagina
-from app.api import dependencies
 from tests.fabricas import un_material, una_evaluacion, una_formula
 
 

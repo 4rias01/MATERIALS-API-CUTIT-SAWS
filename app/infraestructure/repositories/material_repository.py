@@ -30,7 +30,7 @@ class MaterialRepository(IMaterialRepository):
         return bool(await self._sesion.scalar(select(exists().where(condicion))))
 
     async def siguiente_numero(self) -> int:
-        return int(await self._sesion.scalar(select(SECUENCIA_MATERIAL.next_value())))
+        return int((await self._sesion.execute(select(SECUENCIA_MATERIAL.next_value()))).scalar_one())
 
     def agregar(self, material: Material) -> None:
         self._sesion.add(material)

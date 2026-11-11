@@ -43,10 +43,10 @@ class FormulaRepository(IFormulaRepository):
         return bool(await self._sesion.scalar(select(exists().where(condicion))))
 
     async def siguiente_numero(self) -> int:
-        return int(await self._sesion.scalar(select(SECUENCIA_FORMULA.next_value())))
+        return int((await self._sesion.execute(select(SECUENCIA_FORMULA.next_value()))).scalar_one())
 
     async def siguiente_numero_ticket(self) -> int:
-        return int(await self._sesion.scalar(select(SECUENCIA_TICKET_EVALUACION.next_value())))
+        return int((await self._sesion.execute(select(SECUENCIA_TICKET_EVALUACION.next_value()))).scalar_one())
 
     def agregar(self, formula: Formula) -> None:
         self._sesion.add(formula)

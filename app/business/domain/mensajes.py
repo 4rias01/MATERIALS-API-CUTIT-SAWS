@@ -14,7 +14,6 @@ Los marcadores entre corchetes se reemplazan con ``formatear``::
 import re
 from collections.abc import Mapping
 
-
 # HU-01 · Registrar material -------------------------------------------------------------
 # c2.1 · 400
 HU01_C2_1 = "El campo 'Nombre' es obligatorio. Por favor, ingréselo e intente nuevamente."

@@ -4,10 +4,10 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Path
 
-from app.business.services.evaluacion_patente_service import EvaluacionPatenteService
 from app.api.dependencies import obtener_evaluacion_patente_service
 from app.api.schemas.comun import respuestas_error
 from app.api.schemas.evaluacion_patente import DictamenSolicitud, TramiteEvaluacionRespuesta
+from app.business.services.evaluacion_patente_service import EvaluacionPatenteService
 
 router = APIRouter(prefix="/formulas", tags=["Evaluación de patentes"])
 

@@ -6,10 +6,10 @@ from typing import Any, Self
 
 from pydantic import Field
 
+from app.api.schemas.comun import DecimalEntrada, DecimalSalida, EsquemaEntrada, EsquemaSalida
 from app.business.domain.enums import Categoria, EstadoMaterial, UnidadMedida
 from app.business.services.comandos import ActualizarMaterialComando, RegistrarMaterialComando
 from app.core.paginacion import Pagina
-from app.api.schemas.comun import DecimalEntrada, DecimalSalida, EsquemaEntrada, EsquemaSalida
 
 # ---------------------------------------------------------------------------------------
 # Entrada
@@ -135,7 +135,7 @@ class MaterialRespuesta(MaterialFichaRespuesta):
     mensaje: str | None = Field(default=None, examples=["Material 'Acero al carbono 1045' registrado exitosamente con el SKU MP-00001."])
 
     @classmethod
-    def desde_modelo(cls, material: Any, mensaje: str | None = None) -> Self:  # type: ignore[override]
+    def desde_modelo(cls, material: Any, mensaje: str | None = None) -> Self:
         return cls(
             **cls._campos(material),
             fecha_ultima_actualizacion=material.fecha_actualizacion,

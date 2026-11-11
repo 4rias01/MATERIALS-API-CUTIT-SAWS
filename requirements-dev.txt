@@ -4,3 +4,7 @@ pytest==9.1.1
 pytest-asyncio==1.4.0
 pytest-cov==7.1.0
 coverage==7.16.2
+# Calidad (configuración en pyproject.toml).
+ruff==0.17.4
+mypy==2.4.1
+import-linter==2.16
