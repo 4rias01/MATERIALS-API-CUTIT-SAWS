@@ -6,16 +6,12 @@ import pytest
 
 from app.business.domain.errores import Motivo, ValorInvalidoError
 from app.business.domain.value_objects import (
-    Cantidad,
     Densidad,
     NombreMaterial,
     Pureza,
     Sku,
-    Version,
     contar_caracteres,
-    id_formula,
     id_material,
-    id_ticket_evaluacion,
     normalizar_nombre,
 )
 
@@ -94,28 +90,6 @@ class TestPureza:
         assert error.value.motivo == Motivo.DEMASIADOS_DIGITOS
 
 
-class TestCantidad:
-    @pytest.mark.parametrize("valor", ["0.001", "1", "999999.999", "2.500"])
-    def test_acepta_mayor_que_0_con_hasta_6_enteros_y_3_decimales(self, valor: str) -> None:
-        assert Cantidad(Decimal(valor)).valor == Decimal(valor)
-
-    @pytest.mark.parametrize("valor", ["0", "-2"])
-    def test_rechaza_no_positivas(self, valor: str) -> None:
-        with pytest.raises(ValorInvalidoError) as error:
-            Cantidad(Decimal(valor))
-        assert error.value.motivo == Motivo.NO_POSITIVO
-
-    @pytest.mark.parametrize("valor", ["1000000", "1.0001"])
-    def test_rechaza_mas_digitos_de_los_permitidos(self, valor: str) -> None:
-        with pytest.raises(ValorInvalidoError) as error:
-            Cantidad(Decimal(valor))
-        assert error.value.motivo == Motivo.DEMASIADOS_DIGITOS
-
-    @pytest.mark.parametrize(("valor", "entera"), [("3", True), ("3.000", True), ("3.5", False)])
-    def test_es_entera(self, valor: str, entera: bool) -> None:
-        assert Cantidad(Decimal(valor)).es_entera() is entera
-
-
 def test_sku_valida_formato_mp_00000() -> None:
     assert str(Sku("MP-00001")) == "MP-00001"
     for invalido in ("MP-1", "mp-00001", "MP-000001", ""):
@@ -123,18 +97,10 @@ def test_sku_valida_formato_mp_00000() -> None:
             Sku(invalido)
 
 
-def test_version_empieza_en_1_y_aumenta_de_1_en_1() -> None:
-    assert Version().valor == 1
-    assert Version(3).siguiente() == Version(4)
-    with pytest.raises(ValorInvalidoError):
-        Version(0)
-
-
-def test_identificadores_secuenciales() -> None:
+def test_id_de_material_secuencial() -> None:
     assert id_material(1) == "mat-001"
+    assert id_material(42) == "mat-042"
     assert id_material(1000) == "mat-1000"
-    assert id_formula(42) == "form-042"
-    assert id_ticket_evaluacion(7) == "tck-007"
     with pytest.raises(ValorInvalidoError):
         id_material(0)
 

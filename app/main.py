@@ -5,8 +5,8 @@ viven mientras corre el proceso (patrones Object Pool e inyección con instancia
 compartidas):
 
 * El motor de SQLAlchemy con su pool de conexiones y la fábrica de sesiones.
-* Un único ``httpx.AsyncClient`` (reutiliza conexiones) y los clientes de Inventario y
-  Patent Sweep, cada uno con su circuit breaker.
+* Un único ``httpx.AsyncClient`` (reutiliza conexiones) y el cliente de Inventario con
+  su circuit breaker.
 * El bus de eventos de dominio con sus suscriptores (log y métricas).
 
 También registra el middleware de traceId, el manejador global de excepciones, los
@@ -20,18 +20,17 @@ from contextlib import asynccontextmanager
 import httpx
 from fastapi import FastAPI
 
+from app.api.exception_handlers import registrar_manejadores
+from app.api.middleware import TraceIdMiddleware
+from app.api.routers import health, materiales
 from app.core.config import Configuracion, obtener_configuracion
 from app.core.events import BusEventos, registrar_evento_en_log
 from app.core.logging import configurar_logging
 from app.core.metrics import configurar_metricas, contar_evento
 from app.core.openapi import DESCRIPCION, ETIQUETAS, ajustar_openapi
-from app.data_access.clients import CircuitBreaker, InventarioClient, PatentSweepClient
-from app.data_access.clients.inventario_client import SERVICIO as SERVICIO_INVENTARIO
-from app.data_access.clients.patent_sweep_client import SERVICIO as SERVICIO_PATENT_SWEEP
-from app.data_access.database import crear_fabrica_sesiones, crear_motor
-from app.presentation.exception_handlers import registrar_manejadores
-from app.presentation.middleware import TraceIdMiddleware
-from app.presentation.routers import evaluacion_patente, formulas, health, materiales
+from app.infraestructure.clients import CircuitBreaker, InventarioClient
+from app.infraestructure.clients.inventario_client import SERVICIO as SERVICIO_INVENTARIO
+from app.infraestructure.database import crear_fabrica_sesiones, crear_motor
 
 logger = logging.getLogger("app")
 
@@ -57,14 +56,10 @@ async def ciclo_de_vida(app: FastAPI) -> AsyncIterator[None]:
     app.state.cliente_inventario = InventarioClient(
         http, config, CircuitBreaker(SERVICIO_INVENTARIO, config.cb_umbral_fallos, config.cb_tiempo_abierto_s)
     )
-    app.state.cliente_patent_sweep = PatentSweepClient(
-        http, config, CircuitBreaker(SERVICIO_PATENT_SWEEP, config.cb_umbral_fallos, config.cb_tiempo_abierto_s)
-    )
     app.state.bus_eventos = crear_bus_eventos()
     logger.info(
         "API iniciada",
-        extra={"version": config.app_version, "entorno": config.entorno, "inventarioUrl": config.inventario_url,
-               "patentSweepUrl": config.patent_sweep_url},
+        extra={"version": config.app_version, "entorno": config.entorno, "inventarioUrl": config.inventario_url},
     )
     try:
         yield
@@ -95,8 +90,6 @@ def crear_app(config: Configuracion | None = None) -> FastAPI:
 
     app.include_router(health.router)
     app.include_router(materiales.router)
-    app.include_router(formulas.router)
-    app.include_router(evaluacion_patente.router)
 
     configurar_metricas(app)
     ajustar_openapi(app)

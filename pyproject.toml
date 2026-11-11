@@ -1,0 +1,70 @@
+# Configuración de las herramientas de calidad que corre la integración continua
+# (.github/workflows/ci.yml). Las dependencias están en requirements*.txt.
+
+# --- Linter (análisis estático) ---------------------------------------------------------
+[tool.ruff]
+target-version = "py312"
+line-length = 140
+
+[tool.ruff.lint]
+select = [
+    "E", "W",  # pycodestyle
+    "F",       # pyflakes: imports y variables sin usar, nombres indefinidos
+    "I",       # orden de imports
+    "B",       # bugbear: errores comunes
+    "UP",      # sintaxis moderna de Python 3.12
+    "SIM",     # simplificaciones
+    "C4",      # comprensiones
+    "RUF",     # reglas propias de ruff
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Nombres de prueba descriptivos y datos de ejemplo largos.
+"tests/**" = ["E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app", "tests"]
+
+# --- Type checker -----------------------------------------------------------------------
+[tool.mypy]
+python_version = "3.12"
+files = ["app"]
+plugins = ["pydantic.mypy"]
+check_untyped_defs = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+
+# asyncpg no publica anotaciones de tipos.
+[[tool.mypy.overrides]]
+module = ["asyncpg", "asyncpg.*"]
+ignore_missing_imports = true
+
+# --- Validación de arquitectura ---------------------------------------------------------
+[tool.importlinter]
+root_package = "app"
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "Arquitectura en capas: api -> business -> infraestructure -> core"
+type = "layers"
+layers = [
+    "app.api",
+    "app.business",
+    "app.infraestructure",
+    "app.core",
+]
+
+[[tool.importlinter.contracts]]
+name = "El dominio no depende de servicios, infraestructura, API ni frameworks"
+type = "forbidden"
+source_modules = ["app.business.domain"]
+forbidden_modules = [
+    "app.business.services",
+    "app.infraestructure",
+    "app.api",
+    "fastapi",
+    "starlette",
+    "sqlalchemy",
+    "httpx",
+]
