@@ -284,8 +284,8 @@ mkdir -p ~/materiales-formulas && cd ~/materiales-formulas
 nano .env      # copiar .env.example y completar: usuarios, claves y URLs de las otras células
 ```
 
-Grupo de seguridad: 22 (SSH del pipeline) y `API_PUERTO_HOST` (API), abierto solo a las IP de
-las EC2 de las otras células.
+Grupo de seguridad: 22 (SSH del pipeline) y `API_PUERTO_HOST` (API), abierto a todas las ipv4 
+usando la clave pem como seguridad.
 PostgreSQL y node-exporter no se publican; Prometheus y Grafana solo escuchan en localhost de
 la EC2 (`ssh -L 9090:localhost:9090 -L 3820:localhost:3820 ...` para verlos).
 
