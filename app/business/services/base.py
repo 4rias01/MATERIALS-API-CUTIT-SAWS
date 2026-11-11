@@ -34,8 +34,8 @@ from app.core.exceptions import (
     ErrorServicioExterno,
     NoImplementadoError,
 )
-from app.data_access.interfaces import IAuditoriaRepository, IUnitOfWork
-from app.data_access.models import Auditoria
+from app.infraestructure.interfaces import IAuditoriaRepository, IUnitOfWork
+from app.infraestructure.models import Auditoria
 
 logger = logging.getLogger(__name__)
 

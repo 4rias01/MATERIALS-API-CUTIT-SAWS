@@ -8,10 +8,10 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import ErrorIntegridadDatos
-from app.data_access.interfaces import FiltrosBusquedaFormulas
-from app.data_access.models import Auditoria
-from app.data_access.repositories import AuditoriaRepository, FormulaRepository, MaterialRepository
-from app.data_access.unit_of_work import UnitOfWork
+from app.infraestructure.interfaces import FiltrosBusquedaFormulas
+from app.infraestructure.models import Auditoria
+from app.infraestructure.repositories import AuditoriaRepository, FormulaRepository, MaterialRepository
+from app.infraestructure.unit_of_work import UnitOfWork
 from tests.fabricas import un_material, un_registro_auditoria, una_evaluacion, una_formula
 
 

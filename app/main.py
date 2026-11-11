@@ -25,13 +25,13 @@ from app.core.events import BusEventos, registrar_evento_en_log
 from app.core.logging import configurar_logging
 from app.core.metrics import configurar_metricas, contar_evento
 from app.core.openapi import DESCRIPCION, ETIQUETAS, ajustar_openapi
-from app.data_access.clients import CircuitBreaker, InventarioClient, PatentSweepClient
-from app.data_access.clients.inventario_client import SERVICIO as SERVICIO_INVENTARIO
-from app.data_access.clients.patent_sweep_client import SERVICIO as SERVICIO_PATENT_SWEEP
-from app.data_access.database import crear_fabrica_sesiones, crear_motor
-from app.presentation.exception_handlers import registrar_manejadores
-from app.presentation.middleware import TraceIdMiddleware
-from app.presentation.routers import evaluacion_patente, formulas, health, materiales
+from app.infraestructure.clients import CircuitBreaker, InventarioClient, PatentSweepClient
+from app.infraestructure.clients.inventario_client import SERVICIO as SERVICIO_INVENTARIO
+from app.infraestructure.clients.patent_sweep_client import SERVICIO as SERVICIO_PATENT_SWEEP
+from app.infraestructure.database import crear_fabrica_sesiones, crear_motor
+from app.api.exception_handlers import registrar_manejadores
+from app.api.middleware import TraceIdMiddleware
+from app.api.routers import evaluacion_patente, formulas, health, materiales
 
 logger = logging.getLogger("app")
 

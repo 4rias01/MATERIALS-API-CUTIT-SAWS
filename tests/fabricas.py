@@ -3,7 +3,7 @@
 from datetime import UTC, datetime
 from decimal import Decimal
 
-from app.data_access.models import Auditoria, ComponenteFormula, EvaluacionPatente, Formula, Material, PatenteConflicto
+from app.infraestructure.models import Auditoria, ComponenteFormula, EvaluacionPatente, Formula, Material, PatenteConflicto
 
 FECHA = datetime(2026, 10, 20, 15, 30, tzinfo=UTC)
 

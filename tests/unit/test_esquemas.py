@@ -8,14 +8,14 @@ import pytest
 from pydantic import Field, ValidationError, field_validator
 
 from app.business.domain import mensajes
-from app.presentation.schemas.comun import (
+from app.api.schemas.comun import (
     TIPO_ERROR_NEGOCIO,
     DecimalSalida,
     EsquemaEntrada,
     EsquemaSalida,
     error_de_negocio,
 )
-from app.presentation.schemas.formulas import FiltrosFormulasConsulta, PaginacionAprobadasConsulta
+from app.api.schemas.formulas import FiltrosFormulasConsulta, PaginacionAprobadasConsulta
 
 
 class Ejemplo(EsquemaEntrada):

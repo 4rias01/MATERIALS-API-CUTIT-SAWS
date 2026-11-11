@@ -15,7 +15,7 @@ from app.business.services.base import Resultado, ServicioBase, operacion_de_neg
 from app.business.services.comandos import RegistrarDictamenComando
 from app.core.events import BusEventos
 from app.core.exceptions import NoImplementadoError
-from app.data_access.interfaces import IAuditoriaRepository, IFormulaRepository, IPatentSweepClient, IUnitOfWork
+from app.infraestructure.interfaces import IAuditoriaRepository, IFormulaRepository, IPatentSweepClient, IUnitOfWork
 
 RECURSO = "formula"
 

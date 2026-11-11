@@ -5,14 +5,14 @@ from types import TracebackType
 
 from app.core.exceptions import ErrorBaseDatos
 from app.core.paginacion import Pagina, calcular_desplazamiento
-from app.data_access.interfaces import (
+from app.infraestructure.interfaces import (
     FiltrosBusquedaFormulas,
     IAuditoriaRepository,
     IFormulaRepository,
     IMaterialRepository,
     IUnitOfWork,
 )
-from app.data_access.models import Auditoria, EvaluacionPatente, Formula, Material
+from app.infraestructure.models import Auditoria, EvaluacionPatente, Formula, Material
 
 
 def _orden_consecutivo(identificador: str) -> tuple[int, str]:
