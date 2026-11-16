@@ -1,11 +1,15 @@
 # Integración continua de la célula Materiales y Fórmulas (rama develop).
 #
 # Corre en cada Pull Request hacia develop y en cada push a develop:
-#   1. calidad ........ linter (ruff), type checker (mypy) y validación de arquitectura (import-linter).
+#   1. calidad ........ linter (ruff, incluye las reglas de seguridad de Bandit), type checker (mypy)
+#                       y validación de arquitectura (import-linter).
+#   1b. seguridad ..... análisis estático OWASP Top 10 (Semgrep) y dependencias con
+#                       vulnerabilidades conocidas (pip-audit). Falla el PR si encuentra algo.
 #   2. pruebas ........ unitarias e integración contra PostgreSQL (docker compose), cobertura
 #                       mínima del 80 % y análisis de SonarCloud con quality gate.
 #   3. imagen-docker .. verifica que la imagen Docker se construye (no la publica).
-# La configuración de ruff, mypy e import-linter está en pyproject.toml.
+# La configuración de ruff, mypy e import-linter está en pyproject.toml; las versiones de
+# Semgrep y pip-audit, en requirements-seguridad.txt.
 #
 # Secretos (Settings > Secrets and variables > Actions):
 #   SONAR_TOKEN                        token del proyecto en SonarCloud
@@ -48,6 +52,34 @@ jobs:
 
       - name: Validación de arquitectura (import-linter)
         run: lint-imports
+
+  seguridad:
+    name: Análisis de seguridad (OWASP)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-seguridad.txt
+
+      # Entorno sin la aplicación: semgrep y FastAPI piden versiones distintas de opentelemetry.
+      - name: Instalar herramientas de seguridad
+        run: pip install -r requirements-seguridad.txt
+
+      # Código Python, secretos, Dockerfile, docker-compose y GitHub Actions.
+      # --error: termina con código 1 si hay hallazgos. --metrics=off: no envía telemetría.
+      - name: Análisis estático (Semgrep, OWASP Top 10)
+        run: >-
+          semgrep scan --error --metrics=off
+          --config p/owasp-top-ten --config p/python --config p/secrets
+          --config p/dockerfile --config p/docker-compose --config p/github-actions
+
+      # OWASP A06: falla si alguna dependencia declarada tiene una vulnerabilidad conocida.
+      - name: Dependencias vulnerables (pip-audit)
+        run: pip-audit --progress-spinner off -r requirements.txt -r requirements-dev.txt
 
   pruebas:
     name: Pruebas, cobertura y SonarCloud
