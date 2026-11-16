@@ -6,5 +6,6 @@ Importar desde aquí garantiza que todas las tablas queden registradas en
 
 from app.infraestructure.models.auditoria import Auditoria
 from app.infraestructure.models.base import Base
+from app.infraestructure.models.material import Material
 
-__all__ = ["Auditoria", "Base"]
+__all__ = ["Auditoria", "Base", "Material"]

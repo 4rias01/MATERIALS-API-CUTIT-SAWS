@@ -39,7 +39,8 @@ def respuesta_error(request: Request, codigo: int, mensaje: str, cabeceras: dict
 
 
 async def manejar_error_aplicacion(request: Request, exc: Exception) -> JSONResponse:
-    assert isinstance(exc, ErrorAplicacion)
+    if not isinstance(exc, ErrorAplicacion):  # no ocurre: el manejador se registra para ese tipo
+        return await manejar_error_no_controlado(request, exc)
     datos = {"estado": exc.codigo_http, "error": type(exc).__name__, "trace_id": _trace_id(request)}
     if isinstance(exc, NoImplementadoError):
         logger.warning(exc.mensaje, extra=datos)
@@ -52,7 +53,8 @@ async def manejar_error_aplicacion(request: Request, exc: Exception) -> JSONResp
 
 
 async def manejar_error_validacion(request: Request, exc: Exception) -> JSONResponse:
-    assert isinstance(exc, RequestValidationError)
+    if not isinstance(exc, RequestValidationError):  # no ocurre: el manejador se registra para ese tipo
+        return await manejar_error_no_controlado(request, exc)
     errores = exc.errors()
     if errores and errores[0].get("type") == TIPO_ERROR_NEGOCIO:
         mensaje = str(errores[0]["msg"])
@@ -73,7 +75,8 @@ async def manejar_error_validacion(request: Request, exc: Exception) -> JSONResp
 
 
 async def manejar_error_http(request: Request, exc: Exception) -> JSONResponse:
-    assert isinstance(exc, StarletteHTTPException)
+    if not isinstance(exc, StarletteHTTPException):  # no ocurre: el manejador se registra para ese tipo
+        return await manejar_error_no_controlado(request, exc)
     mensaje = {404: mensajes.RUTA_NO_ENCONTRADA, 405: mensajes.METODO_NO_PERMITIDO}.get(exc.status_code)
     if mensaje is None:
         mensaje = exc.detail if isinstance(exc.detail, str) else mensajes.SOLICITUD_INVALIDA
