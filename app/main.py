@@ -22,7 +22,7 @@ from fastapi import FastAPI
 
 from app.api.exception_handlers import registrar_manejadores
 from app.api.middleware import TraceIdMiddleware
-from app.api.routers import health
+from app.api.routers import health, materiales
 from app.core.config import Configuracion, obtener_configuracion
 from app.core.events import BusEventos, registrar_evento_en_log
 from app.core.logging import configurar_logging
@@ -87,6 +87,7 @@ def crear_app(config: Configuracion | None = None) -> FastAPI:
     registrar_manejadores(app)
 
     app.include_router(health.router)
+    app.include_router(materiales.router)
 
     configurar_metricas(app)
     ajustar_openapi(app)

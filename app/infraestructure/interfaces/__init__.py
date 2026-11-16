@@ -7,10 +7,12 @@ reemplazan por dobles (tests/dobles).
 
 from app.infraestructure.interfaces.auditoria_repository import IAuditoriaRepository
 from app.infraestructure.interfaces.cliente_externo import IClienteExterno
+from app.infraestructure.interfaces.material_repository import IMaterialRepository
 from app.infraestructure.interfaces.unit_of_work import IUnitOfWork
 
 __all__ = [
     "IAuditoriaRepository",
     "IClienteExterno",
+    "IMaterialRepository",
     "IUnitOfWork",
 ]

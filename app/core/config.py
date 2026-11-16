@@ -39,7 +39,8 @@ class Configuracion(BaseSettings):
     postgres_user: str | None = None
     postgres_password: SecretStr | None = None
     postgres_host: str = "postgres"
-    postgres_port: int = 5432
+    # 5520 en lugar del puerto por defecto de PostgreSQL (ver docker-compose.yml).
+    postgres_port: int = 5520
     postgres_db: str = "materiales_formulas"
     # Object Pool: conexiones reutilizadas entre peticiones.
     db_pool_size: int = Field(default=5, ge=1)

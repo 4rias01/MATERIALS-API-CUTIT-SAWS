@@ -9,6 +9,8 @@ if TYPE_CHECKING:
 DESCRIPCION = """
 API REST del módulo **Materiales y Fórmulas** de la plataforma backend de Cutit Saws Ltd.
 
+* **Materiales**: CRUD básico (crear, listar, buscar por id o por nombre, actualizar y eliminar).
+
 **Formato de las respuestas**
 
 * Éxito: los campos del recurso en camelCase y, cuando el backlog lo define, el campo
@@ -23,6 +25,7 @@ API REST del módulo **Materiales y Fórmulas** de la plataforma backend de Cuti
 """
 
 ETIQUETAS = [
+    {"name": "Materiales", "description": "CRUD básico de materiales."},
     {"name": "Monitoreo", "description": "Estado de la API (/health). Las métricas están en /metrics."},
 ]
 

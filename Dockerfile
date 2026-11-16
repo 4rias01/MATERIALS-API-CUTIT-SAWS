@@ -1,4 +1,5 @@
-# Imagen de la API Materiales y Fórmulas: FastAPI con Uvicorn en el puerto 8000.
+# Imagen de la API Materiales y Fórmulas: FastAPI con Uvicorn en el puerto 8520
+# (no el puerto por defecto de Uvicorn).
 # Al iniciar aplica las migraciones pendientes (Alembic) y arranca la API.
 FROM python:3.12-slim
 
@@ -23,10 +24,10 @@ COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod 755 /usr/local/bin/entrypoint.sh
 
 USER app
-EXPOSE 8000
+EXPOSE 8520
 
 # /health responde 200 si la API alcanza su base de datos (503 si no).
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
-    CMD ["python", "-c", "import sys, urllib.request; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=4).status == 200 else 1)"]
+    CMD ["python", "-c", "import sys, urllib.request; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8520/health', timeout=4).status == 200 else 1)"]
 
 ENTRYPOINT ["entrypoint.sh"]
