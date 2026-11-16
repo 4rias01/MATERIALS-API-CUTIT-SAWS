@@ -2,7 +2,7 @@
 
 No tienen código HTTP ni mensaje para el cliente: el schema o el servicio que los
 captura decide qué mensaje del backlog devolver (por ejemplo, una ``ValorInvalidoError``
-del nombre con motivo LONGITUD se responde con ``mensajes.HU01_C2_2_A``).
+con motivo LONGITUD se responde con el mensaje de longitud del criterio de la HU).
 """
 
 from enum import StrEnum
