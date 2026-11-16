@@ -12,12 +12,12 @@ Implementa el **DAS v1.2** del módulo y el **product backlog V1.3**.
 |---|---|
 | Arquitectura en capas, inyección de dependencias, configuración por variables de entorno | HU-01 a HU-11 (rutas, DTO, servicios, tablas, clientes y pruebas) |
 | CRUD básico de materiales: crear, listar, buscar por id o por nombre, actualizar y eliminar | Clientes de Inventario y Patent Sweep (contrato POR ACORDAR, sección 11) |
-| Modelos ORM y migraciones Alembic de `auditoria` y `material` | Pruebas del resto de la infraestructura (cobertura < 80 %, sección 3) |
+| Modelos ORM y migraciones Alembic de `auditoria` y `material` | |
 | Unidad de trabajo (commit/rollback, timeout de 5 s), auditoría, eventos de dominio | |
 | Cliente HTTP base (timeout de 5 s, circuit breaker, traceId) | |
 | traceId, logs JSON, manejador global de errores, `/health`, `/metrics`, Swagger | |
 | Dockerfile, Docker Compose, Prometheus, Grafana, node-exporter, GitHub Actions, SonarCloud | |
-| Pruebas unitarias (`MaterialService`) y de integración (API de materiales contra PostgreSQL) | |
+| Pruebas unitarias y de integración (CRUD de materiales e infraestructura; cobertura ~97 %) | |
 | Análisis estático de seguridad: reglas de Bandit en ruff (CI), Semgrep OWASP Top 10 y pip-audit | |
 
 ---
@@ -54,10 +54,12 @@ app/
 migrations/                     Migraciones versionadas (Alembic)
 tests/
 ├── conftest.py                 Fixtures comunes: app, cliente HTTP en memoria, configuración de prueba
-├── unit/                       Sin base de datos: test_material_service.py (repositorio simulado con AsyncMock)
-├── integration/                Contra PostgreSQL (TEST_DATABASE_URL): test_material_api.py; conftest.py aplica migraciones
+├── unit/                       Sin base de datos: MaterialService (repositorio simulado con AsyncMock), API,
+│                               manejador de errores, cliente HTTP y circuit breaker, servicio base, logging
+├── integration/                Contra PostgreSQL (TEST_DATABASE_URL): API de materiales, unidad de trabajo,
+│                               /health y migraciones; conftest.py aplica las migraciones
 ├── hu/                         Una o más pruebas por criterio de aceptación (vacío por ahora)
-└── dobles/                     Unidad de trabajo y auditoría en memoria (Test Double)
+└── dobles/                     Unidad de trabajo, auditoría y cliente externo en memoria (Test Double)
 monitoring/                     prometheus.yml y aprovisionamiento + tablero de Grafana
 .github/workflows/ci.yml        Integración continua (develop): ruff, mypy, import-linter, pruebas, SonarCloud
 .github/workflows/cd.yml        Despliegue continuo (main): imagen en GHCR y despliegue en EC2
@@ -147,10 +149,6 @@ semgrep scan --metrics=off --config p/owasp-top-ten --config p/python --config p
   --config p/dockerfile --config p/docker-compose --config p/github-actions --exclude .venv .
 pip-audit -r requirements.txt -r requirements-dev.txt           # dependencias con CVE conocidas (A06)
 ```
-
-> La cobertura actual (~72 %) está por debajo del 80 % que exige el CI: solo el CRUD de
-> materiales tiene pruebas. Hay que agregar pruebas del resto de la infraestructura o ajustar
-> el umbral en `.github/workflows/ci.yml`.
 
 Las pruebas de integración usan `TEST_DATABASE_URL` (sin valor por defecto; si no está
 definida se omiten), por ejemplo `postgresql+asyncpg://<usuario>:<clave>@127.0.0.1:<POSTGRES_PUERTO_HOST>/materiales_formulas_test`.
