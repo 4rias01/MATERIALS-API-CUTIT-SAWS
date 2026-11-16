@@ -9,9 +9,6 @@ if TYPE_CHECKING:
 DESCRIPCION = """
 API REST del módulo **Materiales y Fórmulas** de la plataforma backend de Cutit Saws Ltd.
 
-* **Materiales** (HU-01): registrar un material nuevo, que también se registra como
-  materia prima en Inventario.
-
 **Formato de las respuestas**
 
 * Éxito: los campos del recurso en camelCase y, cuando el backlog lo define, el campo
@@ -26,7 +23,6 @@ API REST del módulo **Materiales y Fórmulas** de la plataforma backend de Cuti
 """
 
 ETIQUETAS = [
-    {"name": "Materiales", "description": "Catálogo de materiales (HU-01)."},
     {"name": "Monitoreo", "description": "Estado de la API (/health). Las métricas están en /metrics."},
 ]
 

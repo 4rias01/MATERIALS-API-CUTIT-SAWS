@@ -1,6 +1,6 @@
 """Base de los clientes HTTP (patrón Gateway).
 
-Centraliza lo que comparte todo cliente de otra célula (hoy, Inventario):
+Centraliza lo que comparte todo cliente de otra célula (Inventario, Patent Sweep):
 
 * Timeout total de 5 s por llamada (``HTTP_TIMEOUT_S``).
 * Circuit Breaker por servicio.
@@ -23,11 +23,14 @@ from app.core.contexto import nuevo_trace_id, obtener_trace_id
 from app.core.exceptions import ErrorServicioExterno
 from app.core.metrics import DURACION_LLAMADAS_EXTERNAS, LLAMADAS_EXTERNAS
 from app.infraestructure.clients.circuit_breaker import CircuitBreaker
+from app.infraestructure.interfaces.cliente_externo import IClienteExterno
 
 logger = logging.getLogger(__name__)
 
 
-class ClienteHttpBase:
+class ClienteHttpBase(IClienteExterno):
+    """Base de los clientes concretos: implementan sus operaciones con ``_enviar``."""
+
     def __init__(
         self,
         servicio: str,

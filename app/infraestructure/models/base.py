@@ -1,6 +1,6 @@
-"""Base declarativa de SQLAlchemy y secuencia del identificador del material."""
+"""Base declarativa de SQLAlchemy."""
 
-from sqlalchemy import MetaData, Sequence
+from sqlalchemy import MetaData
 from sqlalchemy.orm import DeclarativeBase
 
 # Nombres predecibles para restricciones e índices (los usa Alembic y los mensajes de error).
@@ -15,11 +15,6 @@ CONVENCION_NOMBRES = {
 
 class Base(DeclarativeBase):
     metadata = MetaData(naming_convention=CONVENCION_NOMBRES)
-
-
-# Secuencia del consecutivo mat-NNN. Un número consumido en una transacción que se
-# revierte no se reutiliza (puede haber saltos en la numeración).
-SECUENCIA_MATERIAL = Sequence("seq_material", metadata=Base.metadata)
 
 
 def lista_sql(valores: tuple[str, ...]) -> str:
