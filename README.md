@@ -3,19 +3,22 @@
 API REST de la célula 1 de la plataforma backend de Cutit Saws (Desarrollo de Software II, 2026-2).
 Implementa el **DAS v1.2** del módulo y el **product backlog V1.3**.
 
-> **Estado: arquetipo vacío.** La infraestructura transversal funciona y está probada, pero
-> **aún no hay ninguna historia de usuario implementada**: la API solo publica `/health`,
-> `/metrics` y `/docs`. Cada historia se agrega siguiendo la sección 4.
+> **Estado: arquetipo + CRUD básico de materiales.** La infraestructura transversal funciona y
+> hay un **CRUD básico de `/materiales`** (equivalente al CRUD de profesores del dojo de Java)
+> con pruebas unitarias y de integración. **Aún no hay historias de usuario implementadas**:
+> cada historia se agrega siguiendo la sección 4.
 
 | Funciona hoy | Pendiente |
 |---|---|
 | Arquitectura en capas, inyección de dependencias, configuración por variables de entorno | HU-01 a HU-11 (rutas, DTO, servicios, tablas, clientes y pruebas) |
-| Modelo ORM y migración Alembic de la tabla transversal `auditoria` | Clientes de Inventario y Patent Sweep (contrato POR ACORDAR, sección 11) |
+| CRUD básico de materiales: crear, listar, buscar por id o por nombre, actualizar y eliminar | Clientes de Inventario y Patent Sweep (contrato POR ACORDAR, sección 11) |
+| Modelos ORM y migraciones Alembic de `auditoria` y `material` | Pruebas del resto de la infraestructura (cobertura < 80 %, sección 3) |
 | Unidad de trabajo (commit/rollback, timeout de 5 s), auditoría, eventos de dominio | |
 | Cliente HTTP base (timeout de 5 s, circuit breaker, traceId) | |
 | traceId, logs JSON, manejador global de errores, `/health`, `/metrics`, Swagger | |
 | Dockerfile, Docker Compose, Prometheus, Grafana, node-exporter, GitHub Actions, SonarCloud | |
-| Estructura de pruebas (`tests/unit`, `tests/integration`, `tests/hu`) y fixtures en `conftest.py` | Todas las pruebas |
+| Pruebas unitarias (`MaterialService`) y de integración (API de materiales contra PostgreSQL) | |
+| Análisis estático de seguridad: reglas de Bandit en ruff (CI), Semgrep OWASP Top 10 y pip-audit | |
 
 ---
 
@@ -33,28 +36,28 @@ app/
 │   ├── metrics.py              Métricas de Prometheus y /metrics
 │   └── openapi.py              Documentación del contrato (/docs)
 ├── api/                        Capa de presentación (API REST)
-│   ├── routers/                health.py
+│   ├── routers/                health.py · materiales.py
 │   ├── schemas/                DTO de Pydantic (contratos de entrada y salida, camelCase)
 │   ├── middleware.py           traceId por petición (Correlation ID)
 │   ├── exception_handlers.py   Manejador global de excepciones
 │   └── dependencies.py         Inyección de dependencias (raíz de composición)
 ├── business/                   Capa de lógica de negocio
-│   ├── services/               base.py (transacción, auditoría, errores) · comandos.py · salud_service.py
-│   └── domain/                 errores · eventos · mensajes
+│   ├── services/               base.py (transacción, auditoría, errores) · comandos.py · material_service.py · salud_service.py
+│   └── domain/                 enums · errores · eventos · mensajes
 └── infraestructure/            Capa de acceso a datos
     ├── interfaces/             Contratos que usan los servicios (repositorios, cliente, unidad de trabajo)
     ├── repositories/           Implementaciones con SQLAlchemy
-    ├── models/                 Modelos ORM (auditoria)
+    ├── models/                 Modelos ORM (auditoria y material)
     ├── clients/                Cliente HTTP base + circuit breaker
     ├── unit_of_work.py         Transacción: commit / rollback
     └── database.py             Motor, pool de conexiones y timeouts
 migrations/                     Migraciones versionadas (Alembic)
 tests/
 ├── conftest.py                 Fixtures comunes: app, cliente HTTP en memoria, configuración de prueba
-├── unit/                       Sin base de datos ni APIs externas (vacío por ahora)
-├── integration/                Contra PostgreSQL (TEST_DATABASE_URL); conftest.py aplica migraciones (vacío por ahora)
+├── unit/                       Sin base de datos: test_material_service.py (repositorio simulado con AsyncMock)
+├── integration/                Contra PostgreSQL (TEST_DATABASE_URL): test_material_api.py; conftest.py aplica migraciones
 ├── hu/                         Una o más pruebas por criterio de aceptación (vacío por ahora)
-└── dobles/                     Repositorios, unidad de trabajo y clientes en memoria (Test Double; vacío por ahora)
+└── dobles/                     Unidad de trabajo y auditoría en memoria (Test Double)
 monitoring/                     prometheus.yml y aprovisionamiento + tablero de Grafana
 .github/workflows/ci.yml        Integración continua (develop): ruff, mypy, import-linter, pruebas, SonarCloud
 .github/workflows/cd.yml        Despliegue continuo (main): imagen en GHCR y despliegue en EC2
@@ -86,7 +89,28 @@ docker compose up --build     # usa docker-compose.yml + docker-compose.override
 | Estado | http://localhost:API_PUERTO_HOST/health |
 | Métricas | http://localhost:API_PUERTO_HOST/metrics |
 | Grafana | http://localhost:3820 (usuario y clave del `.env`) |
-| Prometheus | http://localhost:9090 |
+| Prometheus | http://localhost:9520 |
+
+**Puertos.** Ningún servicio usa el puerto por defecto de su producto, para no exponer puertos
+predecibles: API 8520, PostgreSQL 5520, Prometheus 9520, Grafana 3820 y node-exporter 9530
+(dentro de la red de Docker). En el host solo se publican `API_PUERTO_HOST` (del `.env`),
+y Prometheus y Grafana únicamente en `127.0.0.1`. En desarrollo PostgreSQL se publica en
+`127.0.0.1:POSTGRES_PUERTO_HOST` (5533 en `.env.example`).
+
+### CRUD de materiales
+
+| Método y ruta | Respuesta |
+|---|---|
+| `POST /materiales` | 201 con el material creado · 400 datos no válidos · 409 nombre repetido |
+| `GET /materiales` | 200 con la lista |
+| `GET /materiales/buscar?nombre=` | 200 con los que contienen el texto (sin distinguir mayúsculas) |
+| `GET /materiales/{id}` | 200 · 404 si no existe |
+| `PUT /materiales/{id}` | 200 con el material actualizado · 404 · 409 nombre de otro material |
+| `DELETE /materiales/{id}` | 204 · 404 |
+
+Cuerpo de POST y PUT: `{"nombre", "categoria", "unidadMedida", "densidad", "pureza"}`. El id lo
+asigna la base de datos; en PUT va en la ruta, y cualquier campo extra (incluido `id`) se
+rechaza con 400.
 
 ### API en Python, base de datos en Docker (para desarrollar)
 
@@ -96,7 +120,7 @@ pip install -r requirements-dev.txt
 cp .env.example .env                       # completar y descomentar POSTGRES_HOST/POSTGRES_PORT
 docker compose up -d postgres              # PostgreSQL en localhost:POSTGRES_PUERTO_HOST
 alembic upgrade head
-uvicorn app.main:app --reload
+uvicorn app.main:app --reload --port 8520
 ```
 
 ---
@@ -112,6 +136,21 @@ ruff check .                               # linter
 mypy                                       # type checker
 lint-imports                               # arquitectura: api -> business -> infraestructure -> core
 ```
+
+**Análisis estático de seguridad (OWASP Top 10).** `ruff check .` ya incluye las reglas de
+Bandit (`S`), así que el CI las aplica en cada PR. Para un análisis completo:
+
+```bash
+pip install bandit semgrep pip-audit
+bandit -r app migrations                                        # SAST de Python
+semgrep scan --metrics=off --config p/owasp-top-ten --config p/python --config p/secrets \
+  --config p/dockerfile --config p/docker-compose --config p/github-actions --exclude .venv .
+pip-audit -r requirements.txt -r requirements-dev.txt           # dependencias con CVE conocidas (A06)
+```
+
+> La cobertura actual (~72 %) está por debajo del 80 % que exige el CI: solo el CRUD de
+> materiales tiene pruebas. Hay que agregar pruebas del resto de la infraestructura o ajustar
+> el umbral en `.github/workflows/ci.yml`.
 
 Las pruebas de integración usan `TEST_DATABASE_URL` (sin valor por defecto; si no está
 definida se omiten), por ejemplo `postgresql+asyncpg://<usuario>:<clave>@127.0.0.1:<POSTGRES_PUERTO_HOST>/materiales_formulas_test`.
@@ -184,11 +223,14 @@ verde y Pull Request con la plantilla.
 ```bash
 alembic upgrade head                          # aplicar migraciones (el contenedor lo hace al arrancar)
 alembic revision --autogenerate -m "cambio"   # nueva migración después de cambiar un modelo
-alembic check                                 # falla si modelos y migraciones difieren (lo prueba la suite)
+alembic check                                 # falla si modelos y migraciones difieren
 ```
 
-- Tablas: solo `auditoria` (las del MER se agregan con nuevas migraciones cuando se
-  implementen sus historias).
+- Tablas: `auditoria` (0001) y `material` (0002, CRUD básico). Las del MER se agregan con
+  nuevas migraciones cuando se implementen sus historias.
+- `material`: id `BIGINT GENERATED ALWAYS AS IDENTITY`, nombre único sin distinguir
+  mayúsculas (índice `lower(nombre)`), restricciones CHECK de categoría, unidad de medida,
+  densidad (> 0) y pureza (0 a 100).
 - Fechas `TIMESTAMP WITH TIME ZONE` (UTC), devueltas en ISO 8601.
 
 > La migración `0001` se reescribió para dejar solo la tabla `auditoria`. Si tienen una base
@@ -283,7 +325,7 @@ nano .env      # copiar .env.example y completar: usuarios, claves y URLs de las
 Grupo de seguridad: 22 (SSH del pipeline) y `API_PUERTO_HOST` (API), abierto a todas las ipv4 
 usando la clave pem como seguridad.
 PostgreSQL y node-exporter no se publican; Prometheus y Grafana solo escuchan en localhost de
-la EC2 (`ssh -L 9090:localhost:9090 -L 3820:localhost:3820 ...` para verlos).
+la EC2 (`ssh -L 9520:localhost:9520 -L 3820:localhost:3820 ...` para verlos).
 
 **Volver a una versión anterior** (en la EC2):
 `API_IMAGEN=ghcr.io/<propietario>/materiales-formulas-api API_TAG=<commit anterior> docker compose up -d api`.

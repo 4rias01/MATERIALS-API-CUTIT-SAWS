@@ -18,11 +18,12 @@ from typing import Annotated
 from fastapi import Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.business.services.material_service import MaterialService
 from app.business.services.salud_service import SaludService
 from app.core.config import Configuracion
 from app.core.events import BusEventos
-from app.infraestructure.interfaces import IAuditoriaRepository, IClienteExterno, IUnitOfWork
-from app.infraestructure.repositories import AuditoriaRepository
+from app.infraestructure.interfaces import IAuditoriaRepository, IClienteExterno, IMaterialRepository, IUnitOfWork
+from app.infraestructure.repositories import AuditoriaRepository, MaterialRepository
 from app.infraestructure.unit_of_work import UnitOfWork
 
 # --- Recursos compartidos creados en el arranque (app/main.py) ---------------------------
@@ -61,13 +62,24 @@ def obtener_repositorio_auditoria(sesion: Sesion) -> IAuditoriaRepository:
     return AuditoriaRepository(sesion)
 
 
+def obtener_repositorio_materiales(sesion: Sesion) -> IMaterialRepository:
+    return MaterialRepository(sesion)
+
+
 UnidadDeTrabajo = Annotated[IUnitOfWork, Depends(obtener_unidad_de_trabajo)]
 RepositorioAuditoria = Annotated[IAuditoriaRepository, Depends(obtener_repositorio_auditoria)]
+RepositorioMateriales = Annotated[IMaterialRepository, Depends(obtener_repositorio_materiales)]
 Eventos = Annotated[BusEventos, Depends(obtener_bus_eventos)]
 ClientesExternos = Annotated[Mapping[str, IClienteExterno], Depends(obtener_clientes_externos)]
 
 
 # --- Servicios ---------------------------------------------------------------------------
+
+
+def obtener_material_service(
+    uow: UnidadDeTrabajo, auditoria: RepositorioAuditoria, eventos: Eventos, materiales: RepositorioMateriales
+) -> MaterialService:
+    return MaterialService(uow, auditoria, eventos, materiales)
 
 
 def obtener_salud_service(uow: UnidadDeTrabajo, clientes: ClientesExternos) -> SaludService:

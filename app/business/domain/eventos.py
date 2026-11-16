@@ -10,4 +10,8 @@ from enum import StrEnum
 
 
 class TipoEvento(StrEnum):
-    """Eventos de dominio del módulo (aún no hay historias implementadas)."""
+    """Eventos de dominio del módulo."""
+
+    MATERIAL_CREADO = "MaterialCreado"
+    MATERIAL_ACTUALIZADO = "MaterialActualizado"
+    MATERIAL_ELIMINADO = "MaterialEliminado"

@@ -22,6 +22,19 @@ from collections.abc import Mapping
 # (se agregan aquí a medida que se implementan las historias)
 
 
+# CRUD básico de materiales ----------------------------------------------------------------
+# No están en el backlog: son los del CRUD de ejemplo (equivalente al de profesores del dojo).
+
+# 400 · marcadores: [campo]
+MATERIAL_CAMPO_INVALIDO = "El campo '[campo]' es obligatorio o no tiene un formato válido."
+# 404 · marcadores: [id]
+MATERIAL_NO_ENCONTRADO = "Material con id [id] no encontrado"
+# 409 · marcadores: [nombre]
+MATERIAL_NOMBRE_DUPLICADO = "Ya existe un material con el nombre: [nombre]"
+# 500
+MATERIAL_ERROR_BASE_DATOS = "Error interno de conexión con la base de datos. Por favor reintente más tarde"
+
+
 # Mensajes genéricos ----------------------------------------------------------------------
 # No están en el backlog: los usa el manejador global de excepciones cuando ningún
 # criterio define el texto. Propuesta del equipo; confirmar con el PO.

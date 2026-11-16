@@ -20,7 +20,7 @@ from tests.conftest import URL_BD_PRUEBAS
 
 RAIZ = Path(__file__).resolve().parents[2]
 # Al agregar una tabla o secuencia con una migración, agregarla también aquí.
-TABLAS = "auditoria"
+TABLAS = "auditoria, material"
 SECUENCIAS: tuple[str, ...] = ()
 
 
