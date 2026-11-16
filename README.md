@@ -18,7 +18,7 @@ Implementa el **DAS v1.2** del módulo y el **product backlog V1.3**.
 | traceId, logs JSON, manejador global de errores, `/health`, `/metrics`, Swagger | |
 | Dockerfile, Docker Compose, Prometheus, Grafana, node-exporter, GitHub Actions, SonarCloud | |
 | Pruebas unitarias y de integración (CRUD de materiales e infraestructura; cobertura ~97 %) | |
-| Análisis estático de seguridad: reglas de Bandit en ruff (CI), Semgrep OWASP Top 10 y pip-audit | |
+| Análisis de seguridad en el CI: reglas de Bandit en ruff, Semgrep (OWASP Top 10) y pip-audit | |
 
 ---
 
@@ -139,15 +139,16 @@ mypy                                       # type checker
 lint-imports                               # arquitectura: api -> business -> infraestructure -> core
 ```
 
-**Análisis estático de seguridad (OWASP Top 10).** `ruff check .` ya incluye las reglas de
-Bandit (`S`), así que el CI las aplica en cada PR. Para un análisis completo:
+**Análisis de seguridad (OWASP Top 10).** Lo corre el CI en cada PR y falla si hay hallazgos:
+`ruff check .` incluye las reglas de Bandit (`S`), y el job *Análisis de seguridad* corre
+Semgrep y pip-audit. Para correrlo en local, en un entorno virtual **aparte** (semgrep y FastAPI
+piden versiones distintas de opentelemetry):
 
 ```bash
-pip install bandit semgrep pip-audit
-bandit -r app migrations                                        # SAST de Python
-semgrep scan --metrics=off --config p/owasp-top-ten --config p/python --config p/secrets \
-  --config p/dockerfile --config p/docker-compose --config p/github-actions --exclude .venv .
-pip-audit -r requirements.txt -r requirements-dev.txt           # dependencias con CVE conocidas (A06)
+python3.12 -m venv .venv-seguridad && .venv-seguridad/bin/pip install -r requirements-seguridad.txt
+.venv-seguridad/bin/semgrep scan --error --metrics=off --config p/owasp-top-ten --config p/python \
+  --config p/secrets --config p/dockerfile --config p/docker-compose --config p/github-actions
+.venv-seguridad/bin/pip-audit -r requirements.txt -r requirements-dev.txt   # dependencias con CVE conocidas (A06)
 ```
 
 Las pruebas de integración usan `TEST_DATABASE_URL` (sin valor por defecto; si no está
@@ -289,10 +290,13 @@ origen queda en la auditoría.
 
 **Integración continua** (`.github/workflows/ci.yml`), en cada Pull Request y push a `develop`:
 
-1. Calidad: linter (`ruff`), type checker (`mypy`) y validación de arquitectura (`import-linter`).
-2. Pruebas unitarias y de integración contra PostgreSQL (levantado con `docker compose`),
+1. Calidad: linter (`ruff`, con las reglas de seguridad de Bandit), type checker (`mypy`) y
+   validación de arquitectura (`import-linter`).
+2. Seguridad: Semgrep (OWASP Top 10, secretos, Dockerfile, compose y GitHub Actions) y
+   pip-audit (dependencias con vulnerabilidades conocidas).
+3. Pruebas unitarias y de integración contra PostgreSQL (levantado con `docker compose`),
    cobertura mínima del 80 % y análisis de SonarCloud con quality gate.
-3. Build de la imagen Docker (sin publicarla).
+4. Build de la imagen Docker (sin publicarla).
 
 **Despliegue continuo** (`.github/workflows/cd.yml`), en cada push a `main` (al fusionar `develop`):
 se publica la imagen en GHCR (`ghcr.io/<propietario>/materiales-formulas-api:<commit>` y `:latest`)
@@ -302,7 +306,8 @@ y se despliega en la EC2 por SSH; al final se verifica `/health`.
 
 1. *Settings → Branches*: regla para `develop` con "Require a pull request before merging",
    1 aprobación y los checks obligatorios **Linter, type checker y arquitectura**,
-   **Pruebas, cobertura y SonarCloud** y **Build de la imagen Docker**; regla para `main` con
+   **Análisis de seguridad (OWASP)**, **Pruebas, cobertura y SonarCloud** y
+   **Build de la imagen Docker**; regla para `main` con
    "Require a pull request before merging" (solo se fusiona `develop`).
 2. *Settings → Secrets and variables → Actions*: `SONAR_TOKEN`, `EC2_HOST`, `EC2_USUARIO`,
    `EC2_LLAVE_SSH`, `POSTGRES_USER` y `POSTGRES_PASSWORD` (BD de pruebas del CI), y opcionalmente
