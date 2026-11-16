@@ -27,7 +27,6 @@ services:
       ENTORNO: produccion
       INVENTARIO_URL: ${INVENTARIO_URL:-}
       PATENT_SWEEP_URL: ${PATENT_SWEEP_URL:-}
-      PATENT_SWEEP_RUTA_EVALUACION: ${PATENT_SWEEP_RUTA_EVALUACION:-}
     # Puerto del host definido en el .env; dentro de la red interna la API escucha en 8000.
     ports:
       - "${API_PUERTO_HOST}:8000"

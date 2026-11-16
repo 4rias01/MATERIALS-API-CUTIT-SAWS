@@ -7,7 +7,7 @@ punto donde se confirma o se revierte la transacción. El decorador
 * ``ErrorBaseDatos`` (fallo de conexión, de persistencia o timeout > 5 s): la unidad de
   trabajo ya revirtió; se responde ``ErrorInterno`` (500 con traceId) con el mensaje
   del backlog para ese caso de uso.
-* ``ErrorServicioExterno`` (Inventario no responde, falla o tarda > 5 s):
+* ``ErrorServicioExterno`` (la API de otra célula no responde, falla o tarda > 5 s):
   se responde ``DependenciaNoDisponibleError`` (503) con el mensaje del caso de uso.
 * Cualquier otro ``ErrorAplicacion`` (400, 404, 409, 422, 503): se registra en la tabla
   de auditoría en una transacción propia y se propaga.
