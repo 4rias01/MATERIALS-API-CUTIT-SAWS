@@ -11,4 +11,4 @@ services:
 
   postgres:
     ports:
-      - "127.0.0.1:${POSTGRES_PUERTO_HOST}:5432"
+      - "127.0.0.1:${POSTGRES_PUERTO_HOST}:5520"

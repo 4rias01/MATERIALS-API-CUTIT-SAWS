@@ -5,8 +5,8 @@ viven mientras corre el proceso (patrones Object Pool e inyección con instancia
 compartidas):
 
 * El motor de SQLAlchemy con su pool de conexiones y la fábrica de sesiones.
-* Un único ``httpx.AsyncClient`` (reutiliza conexiones) y el cliente de Inventario con
-  su circuit breaker.
+* Un único ``httpx.AsyncClient`` (reutiliza conexiones) que comparten los clientes de
+  las APIs de otras células, cada uno con su circuit breaker.
 * El bus de eventos de dominio con sus suscriptores (log y métricas).
 
 También registra el middleware de traceId, el manejador global de excepciones, los
@@ -28,8 +28,6 @@ from app.core.events import BusEventos, registrar_evento_en_log
 from app.core.logging import configurar_logging
 from app.core.metrics import configurar_metricas, contar_evento
 from app.core.openapi import DESCRIPCION, ETIQUETAS, ajustar_openapi
-from app.infraestructure.clients import CircuitBreaker, InventarioClient
-from app.infraestructure.clients.inventario_client import SERVICIO as SERVICIO_INVENTARIO
 from app.infraestructure.database import crear_fabrica_sesiones, crear_motor
 
 logger = logging.getLogger("app")
@@ -53,13 +51,13 @@ async def ciclo_de_vida(app: FastAPI) -> AsyncIterator[None]:
     app.state.motor = motor
     app.state.fabrica_sesiones = crear_fabrica_sesiones(motor)
     app.state.cliente_http = http
-    app.state.cliente_inventario = InventarioClient(
-        http, config, CircuitBreaker(SERVICIO_INVENTARIO, config.cb_umbral_fallos, config.cb_tiempo_abierto_s)
-    )
+    # Clientes de otras células por nombre de servicio (aparecen en /health). Ejemplo:
+    # {"inventario": InventarioClient(http, config, CircuitBreaker("inventario", ...))}
+    app.state.clientes_externos = {}
     app.state.bus_eventos = crear_bus_eventos()
     logger.info(
         "API iniciada",
-        extra={"version": config.app_version, "entorno": config.entorno, "inventarioUrl": config.inventario_url},
+        extra={"version": config.app_version, "entorno": config.entorno},
     )
     try:
         yield
