@@ -7,7 +7,7 @@
   global responde 400 con ese mensaje. Los validadores de campo también pueden lanzar
   ``error_de_negocio(mensaje)`` directamente.
 
-Ejemplo (ver ``MaterialCrearSolicitud`` en app/api/schemas/materiales.py)::
+Ejemplo::
 
     class MaterialCrearSolicitud(EsquemaEntrada):
         mensajes_error = {
@@ -72,7 +72,7 @@ class EsquemaEntrada(EsquemaBase):
         """Mensaje del backlog para el primer error de validación (None = mensaje genérico).
 
         Se puede sobrescribir cuando el mensaje depende de otros datos de la solicitud o
-        del valor recibido (por ejemplo, ``null`` cuenta como campo omitido en HU-01).
+        del valor recibido (por ejemplo, para tratar ``null`` como campo omitido).
         """
         campo = str(error["loc"][0]) if error["loc"] else ""
         plantilla = cls.mensajes_error.get((campo, error["type"])) or cls.mensajes_error.get((campo, "*"))
@@ -107,7 +107,7 @@ class EsquemaSalida(EsquemaBase):
 class ErrorRespuesta(EsquemaSalida):
     """Cuerpo de toda respuesta de error."""
 
-    mensaje: str = Field(examples=["El material con el nombre 'Acero al carbono 1045' ya se encuentra registrado en el catálogo."])
+    mensaje: str = Field(examples=["La solicitud contiene parámetros o un formato no válido. Por favor, verifique e intente nuevamente."])
     trace_id: str = Field(examples=["3f2a9c1e5b7d4e8f9a0b1c2d3e4f5a6b"], description="Identificador para rastrear el error en los logs.")
 
 

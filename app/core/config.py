@@ -39,7 +39,8 @@ class Configuracion(BaseSettings):
     postgres_user: str | None = None
     postgres_password: SecretStr | None = None
     postgres_host: str = "postgres"
-    postgres_port: int = 5432
+    # 5520 en lugar del puerto por defecto de PostgreSQL (ver docker-compose.yml).
+    postgres_port: int = 5520
     postgres_db: str = "materiales_formulas"
     # Object Pool: conexiones reutilizadas entre peticiones.
     db_pool_size: int = Field(default=5, ge=1)
@@ -49,14 +50,10 @@ class Configuracion(BaseSettings):
 
     # --- Integraciones HTTP (timeout de 5 s) ------------------------------------------
     http_timeout_s: float = Field(default=5.0, gt=0)
-    # POR ACORDAR con la célula de Inventario: URL base de su API.
+    # POR ACORDAR con cada célula: URL base de su API. Aún sin uso: se configuran desde ya
+    # para el despliegue. Las rutas de cada operación se agregan con la HU que las use.
     inventario_url: str | None = None
-    # Ruta definida en el backlog (HU-01 c4).
-    inventario_ruta_materias_primas: str = "/inventario/materias-primas"
-    # POR ACORDAR con la célula de Patent Sweep: URL base y ruta de la solicitud de evaluación
-    # (HU-09). Aún sin uso: se configuran desde ya para el despliegue.
     patent_sweep_url: str | None = None
-    patent_sweep_ruta_evaluacion: str | None = None
     # Circuit Breaker de cada cliente: fallos seguidos para abrir y segundos que permanece abierto.
     cb_umbral_fallos: int = Field(default=5, ge=1)
     cb_tiempo_abierto_s: float = Field(default=30.0, gt=0)

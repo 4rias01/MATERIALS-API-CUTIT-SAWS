@@ -10,8 +10,8 @@ from decimal import Decimal
 
 
 @dataclass(frozen=True, slots=True)
-class RegistrarMaterialComando:
-    """HU-01: POST /materiales."""
+class DatosMaterial:
+    """Campos editables de un material (POST /materiales y PUT /materiales/{id})."""
 
     nombre: str
     categoria: str
