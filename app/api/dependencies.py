@@ -7,9 +7,12 @@ clientes HTTP, siempre detrás de sus interfaces. En las pruebas se reemplazan c
 
 FastAPI reutiliza cada dependencia dentro de una misma petición, así que la unidad de
 trabajo y los repositorios comparten la misma sesión de base de datos.
+
+Para un servicio nuevo: agregar el proveedor de su repositorio (``obtener_repositorio_x``),
+el de su cliente externo si lo usa, y ``obtener_x_service`` que los combine.
 """
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Mapping
 from typing import Annotated
 
 from fastapi import Depends, Request
@@ -19,7 +22,7 @@ from app.business.services.material_service import MaterialService
 from app.business.services.salud_service import SaludService
 from app.core.config import Configuracion
 from app.core.events import BusEventos
-from app.infraestructure.interfaces import IAuditoriaRepository, IInventarioClient, IMaterialRepository, IUnitOfWork
+from app.infraestructure.interfaces import IAuditoriaRepository, IClienteExterno, IMaterialRepository, IUnitOfWork
 from app.infraestructure.repositories import AuditoriaRepository, MaterialRepository
 from app.infraestructure.unit_of_work import UnitOfWork
 
@@ -34,8 +37,9 @@ def obtener_bus_eventos(request: Request) -> BusEventos:
     return request.app.state.bus_eventos
 
 
-def obtener_cliente_inventario(request: Request) -> IInventarioClient:
-    return request.app.state.cliente_inventario
+def obtener_clientes_externos(request: Request) -> Mapping[str, IClienteExterno]:
+    """Clientes de las APIs de otras células, por nombre de servicio."""
+    return request.app.state.clientes_externos
 
 
 # --- Por petición -----------------------------------------------------------------------
@@ -54,33 +58,29 @@ def obtener_unidad_de_trabajo(sesion: Sesion) -> IUnitOfWork:
     return UnitOfWork(sesion)
 
 
-def obtener_repositorio_materiales(sesion: Sesion) -> IMaterialRepository:
-    return MaterialRepository(sesion)
-
-
 def obtener_repositorio_auditoria(sesion: Sesion) -> IAuditoriaRepository:
     return AuditoriaRepository(sesion)
 
 
+def obtener_repositorio_materiales(sesion: Sesion) -> IMaterialRepository:
+    return MaterialRepository(sesion)
+
+
 UnidadDeTrabajo = Annotated[IUnitOfWork, Depends(obtener_unidad_de_trabajo)]
-RepositorioMateriales = Annotated[IMaterialRepository, Depends(obtener_repositorio_materiales)]
 RepositorioAuditoria = Annotated[IAuditoriaRepository, Depends(obtener_repositorio_auditoria)]
+RepositorioMateriales = Annotated[IMaterialRepository, Depends(obtener_repositorio_materiales)]
 Eventos = Annotated[BusEventos, Depends(obtener_bus_eventos)]
-ClienteInventario = Annotated[IInventarioClient, Depends(obtener_cliente_inventario)]
+ClientesExternos = Annotated[Mapping[str, IClienteExterno], Depends(obtener_clientes_externos)]
 
 
 # --- Servicios ---------------------------------------------------------------------------
 
 
 def obtener_material_service(
-    uow: UnidadDeTrabajo,
-    auditoria: RepositorioAuditoria,
-    eventos: Eventos,
-    materiales: RepositorioMateriales,
-    inventario: ClienteInventario,
+    uow: UnidadDeTrabajo, auditoria: RepositorioAuditoria, eventos: Eventos, materiales: RepositorioMateriales
 ) -> MaterialService:
-    return MaterialService(uow, auditoria, eventos, materiales, inventario)
+    return MaterialService(uow, auditoria, eventos, materiales)
 
 
-def obtener_salud_service(uow: UnidadDeTrabajo, inventario: ClienteInventario) -> SaludService:
-    return SaludService(uow, inventario)
+def obtener_salud_service(uow: UnidadDeTrabajo, clientes: ClientesExternos) -> SaludService:
+    return SaludService(uow, clientes)

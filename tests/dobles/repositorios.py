@@ -1,54 +1,41 @@
-"""Repositorios y unidad de trabajo en memoria."""
+"""Unidad de trabajo y auditoría en memoria.
 
-from collections.abc import Sequence
+Los repositorios propios de cada recurso se simulan en cada prueba con
+``AsyncMock(spec=IMaterialRepository)`` (el equivalente al ``@Mock`` de Mockito).
+"""
+
 from types import TracebackType
 
 from app.core.exceptions import ErrorBaseDatos
-from app.infraestructure.interfaces import IAuditoriaRepository, IMaterialRepository, IUnitOfWork
-from app.infraestructure.models import Auditoria, Material
+from app.infraestructure.interfaces import IAuditoriaRepository, IUnitOfWork
+from app.infraestructure.models import Auditoria
 
 
 class UnitOfWorkFalsa(IUnitOfWork):
-    """Cuenta confirmaciones y reversiones; puede simular un fallo de la base de datos.
+    """Cuenta las confirmaciones (commit) sin tocar ninguna base de datos.
 
-    Un bloque ``async with`` que termina sin ``commit`` (con o sin excepción) cuenta como
-    reversión. ``error_en_commit`` es la excepción que lanza el commit (por ejemplo, un
-    ``ErrorIntegridadDatos``); ``fallar_en_commit`` lanza un ``ErrorBaseDatos`` genérico.
+    ``fallar_en_commit`` simula una base de datos que falla al confirmar y
+    ``base_disponible=False`` una base que no responde (para /health).
     """
 
-    def __init__(
-        self,
-        fallar_en_commit: bool = False,
-        base_disponible: bool = True,
-        error_en_commit: ErrorBaseDatos | None = None,
-    ) -> None:
+    def __init__(self, fallar_en_commit: bool = False, base_disponible: bool = True) -> None:
         self.fallar_en_commit = fallar_en_commit
         self.base_disponible = base_disponible
-        self.error_en_commit = error_en_commit
         self.confirmaciones = 0
-        self.reversiones = 0
-        self._confirmado = False
 
     async def __aenter__(self) -> "UnitOfWorkFalsa":
-        self._confirmado = False
         return self
 
-    async def __aexit__(
-        self, tipo: type[BaseException] | None, exc: BaseException | None, traza: TracebackType | None
-    ) -> None:
-        if exc is not None or not self._confirmado:
-            self.reversiones += 1
+    async def __aexit__(self, tipo: type[BaseException] | None, exc: BaseException | None, traza: TracebackType | None) -> None:
+        return None
 
     async def commit(self) -> None:
-        if self.error_en_commit is not None:
-            raise self.error_en_commit
         if self.fallar_en_commit or not self.base_disponible:
             raise ErrorBaseDatos("Fallo simulado de la base de datos")
         self.confirmaciones += 1
-        self._confirmado = True
 
     async def rollback(self) -> None:
-        self.reversiones += 1
+        return None
 
     async def verificar_conexion(self) -> None:
         if not self.base_disponible:
@@ -56,27 +43,10 @@ class UnitOfWorkFalsa(IUnitOfWork):
 
 
 class AuditoriaRepositoryFalso(IAuditoriaRepository):
+    """Guarda en una lista los registros de auditoría que agrega el servicio."""
+
     def __init__(self) -> None:
         self.registros: list[Auditoria] = []
 
     def agregar(self, registro: Auditoria) -> None:
         self.registros.append(registro)
-
-
-class MaterialRepositoryFalso(IMaterialRepository):
-    """Materiales en memoria. No simula el rollback: lo agregado queda en ``materiales``
-    aunque la unidad de trabajo falle; para eso, verificar ``uow.confirmaciones``."""
-
-    def __init__(self, materiales: Sequence[Material] = ()) -> None:
-        self.materiales: dict[str, Material] = {m.id_material: m for m in materiales}
-        self._secuencia = len(self.materiales)
-
-    async def existe_nombre(self, nombre: str) -> bool:
-        return any(m.nombre.lower() == nombre.lower() for m in self.materiales.values())
-
-    async def siguiente_numero(self) -> int:
-        self._secuencia += 1
-        return self._secuencia
-
-    def agregar(self, material: Material) -> None:
-        self.materiales[material.id_material] = material
