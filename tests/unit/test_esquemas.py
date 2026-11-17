@@ -6,20 +6,16 @@ from typing import Any, ClassVar
 import pytest
 from pydantic import Field, ValidationError, field_validator
 
-from app.api.schemas.comun import (
-    TIPO_ERROR_NEGOCIO,
-    DecimalSalida,
-    EsquemaEntrada,
-    EsquemaSalida,
-    error_de_negocio,
-)
-from app.business.domain import mensajes
+from app.api.schemas.comun import TIPO_ERROR_NEGOCIO, DecimalSalida, EsquemaEntrada, EsquemaSalida, error_de_negocio, respuestas_error
+
+OBLIGATORIO = "El campo 'Nombre' es obligatorio."
+NO_VALIDA = "La Categoría '[valor]' no es válida. Valores permitidos: A o B."
 
 
 class Ejemplo(EsquemaEntrada):
     mensajes_error: ClassVar[dict[tuple[str, str], str]] = {
-        ("nombre", "missing"): mensajes.HU01_C2_1,
-        ("categoriaMaterial", "*"): mensajes.HU01_C2_3_B,
+        ("nombre", "missing"): OBLIGATORIO,
+        ("categoriaMaterial", "*"): NO_VALIDA,
         ("sku", "extra_forbidden"): "El campo 'SKU' es de solo lectura",
     }
 
@@ -37,22 +33,20 @@ class Ejemplo(EsquemaEntrada):
 def _error(datos: dict[str, Any]) -> dict[str, Any]:
     with pytest.raises(ValidationError) as error:
         Ejemplo.model_validate(datos)
-    return error.value.errors()[0]
+    return dict(error.value.errors()[0])
 
 
 def test_campo_obligatorio_faltante() -> None:
     error = _error({"categoriaMaterial": "A"})
-    assert (error["type"], error["msg"]) == (TIPO_ERROR_NEGOCIO, mensajes.HU01_C2_1)
+    assert (error["type"], error["msg"]) == (TIPO_ERROR_NEGOCIO, OBLIGATORIO)
 
 
 def test_comodin_y_marcador_valor() -> None:
-    error = _error({"nombre": "Acero", "categoriaMaterial": "Z"})
-    assert error["msg"] == "La Categoría 'Z' no es válida. Valores permitidos: Materia Prima, Componentes o Lubricantes."
+    assert _error({"nombre": "Acero", "categoriaMaterial": "Z"})["msg"] == "La Categoría 'Z' no es válida. Valores permitidos: A o B."
 
 
 def test_campo_de_solo_lectura() -> None:
-    error = _error({"nombre": "Acero", "categoriaMaterial": "A", "sku": "MP-00001"})
-    assert error["msg"] == "El campo 'SKU' es de solo lectura"
+    assert _error({"nombre": "Acero", "categoriaMaterial": "A", "sku": "MP-00001"})["msg"] == "El campo 'SKU' es de solo lectura"
 
 
 def test_validador_de_campo_con_mensaje_propio() -> None:
@@ -60,8 +54,7 @@ def test_validador_de_campo_con_mensaje_propio() -> None:
 
 
 def test_error_sin_mensaje_en_la_tabla_queda_como_error_de_pydantic() -> None:
-    error = _error({"nombre": "Acero", "categoriaMaterial": "A", "otro": 1})
-    assert error["type"] == "extra_forbidden"
+    assert _error({"nombre": "Acero", "categoriaMaterial": "A", "otro": 1})["type"] == "extra_forbidden"
 
 
 def test_solo_acepta_los_nombres_en_camel_case() -> None:
@@ -77,3 +70,7 @@ class Salida(EsquemaSalida):
 @pytest.mark.parametrize(("valor", "json"), [("2.000", '{"valorDecimal":2}'), ("7.850", '{"valorDecimal":7.85}')])
 def test_decimales_se_escriben_como_numeros_json(valor: str, json: str) -> None:
     assert Salida(valor_decimal=Decimal(valor)).model_dump_json() == json
+
+
+def test_respuestas_de_error_documentadas() -> None:
+    assert set(respuestas_error(400, 404)) == {400, 404}

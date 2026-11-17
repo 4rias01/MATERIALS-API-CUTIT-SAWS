@@ -1,38 +1,26 @@
-"""Casos de uso del catálogo de materiales.
+"""Casos de uso del CRUD básico de materiales.
 
-HU-01 (registrar material) es el flujo de ejemplo del sprint 0: recorre las tres capas
-(router → servicio → repositorio y cliente de Inventario) y sirve de modelo para las
-siguientes historias de usuario.
+Equivale al ``ProfesorService`` del dojo de Java: crear (nombre único), actualizar,
+eliminar, listar, obtener por id y buscar por nombre. Cada método recorre las tres
+capas (router → servicio → repositorio) y usa la infraestructura del arquetipo:
+unidad de trabajo, auditoría de las escrituras y eventos de dominio.
 """
 
-import logging
+from collections.abc import Sequence
 
 from app.business.domain import mensajes
-from app.business.domain.enums import EstadoMaterial
-from app.business.domain.errores import ValorInvalidoError
 from app.business.domain.eventos import TipoEvento
 from app.business.domain.mensajes import formatear
-from app.business.domain.value_objects import Sku, id_material, normalizar_nombre
 from app.business.services.base import Resultado, ServicioBase, ahora, operacion_de_negocio
-from app.business.services.comandos import RegistrarMaterialComando
+from app.business.services.comandos import DatosMaterial
 from app.core.events import BusEventos
-from app.core.exceptions import ConflictoError, ErrorBaseDatos, ErrorIntegridadDatos, ErrorServicioExterno
-from app.infraestructure.interfaces import (
-    IAuditoriaRepository,
-    IInventarioClient,
-    IMaterialRepository,
-    IUnitOfWork,
-    NombreDuplicadoEnInventarioError,
-)
+from app.core.exceptions import ConflictoError, ErrorIntegridadDatos, RecursoNoEncontradoError
+from app.infraestructure.interfaces import IAuditoriaRepository, IMaterialRepository, IUnitOfWork
 from app.infraestructure.models import Material
-
-logger = logging.getLogger(__name__)
+from app.infraestructure.models.material import RESTRICCION_NOMBRE_UNICO
 
 RECURSO = "material"
-OPERACION_REGISTRAR = "REGISTRAR_MATERIAL"
-SERVICIO_INVENTARIO = "inventario"
-# Índice único lower(nombre) de la tabla material (app/infraestructure/models/material.py).
-RESTRICCION_NOMBRE_UNICO = "uq_material_nombre_lower"
+ERROR_BD = mensajes.MATERIAL_ERROR_BASE_DATOS
 
 
 class MaterialService(ServicioBase):
@@ -42,96 +30,108 @@ class MaterialService(ServicioBase):
         auditoria: IAuditoriaRepository,
         eventos: BusEventos,
         materiales: IMaterialRepository,
-        inventario: IInventarioClient,
     ) -> None:
         super().__init__(uow, auditoria, eventos)
         self._materiales = materiales
-        self._inventario = inventario
 
-    @operacion_de_negocio(
-        OPERACION_REGISTRAR,
-        RECURSO,
-        mensaje_error_bd=mensajes.HU01_C8,
-        mensaje_servicio_externo=mensajes.HU01_C6,
-    )
-    async def registrar(self, comando: RegistrarMaterialComando) -> Resultado[Material]:
-        """HU-01 · POST /materiales → 201 con el material creado y ``HU01_C7``.
+    # --- Escrituras (se auditan) -----------------------------------------------------
 
-        El schema ya validó los campos y normalizó el nombre (c1 y c2). El decorador
-        traduce los fallos técnicos: Inventario caído o lento → 503 con ``HU01_C6`` (c6);
-        base de datos caída o lenta → 500 con ``HU01_C8`` (c8). Ambos incluyen el traceId.
-        """
-        # Idempotente: el schema ya lo hizo, pero el servicio no depende de quién lo llame.
-        nombre = normalizar_nombre(comando.nombre)
-
-        await self._verificar_nombre_disponible(nombre)
-        # Fuera de la transacción: no se retiene una conexión mientras se espera a Inventario.
-        sku = await self._registrar_en_inventario(nombre, comando.unidad_medida)
-        material = await self._guardar(comando, nombre, sku)
-
-        self._publicar(TipoEvento.MATERIAL_REGISTRADO, materialId=material.id_material, sku=sku)
-        return Resultado(material, formatear(mensajes.HU01_C7, Nombre=nombre, SKU=sku))
-
-    async def _verificar_nombre_disponible(self, nombre: str) -> None:
-        """c3: el nombre no se repite en el catálogo, sin distinguir mayúsculas."""
-        async with self._uow:
-            if await self._materiales.existe_nombre(nombre):
-                raise ConflictoError(formatear(mensajes.HU01_C3, Nombre=nombre))
-
-    async def _registrar_en_inventario(self, nombre: str, unidad_medida: str) -> str:
-        """c4 y c5: registra la materia prima en Inventario (sin importar la categoría) y
-        devuelve el SKU que asignó."""
-        try:
-            codigo = await self._inventario.registrar_materia_prima(nombre, unidad_medida)
-        except NombreDuplicadoEnInventarioError as exc:
-            raise ConflictoError(formatear(mensajes.HU01_C5, Nombre=nombre)) from exc
-        try:
-            return Sku(codigo).valor  # c7.2: formato MP-00000
-        except ValorInvalidoError as exc:
-            logger.error("Inventario devolvió un Código de artículo con formato inválido", extra={"codigoRecibido": codigo})
-            raise ErrorServicioExterno(
-                SERVICIO_INVENTARIO, ErrorServicioExterno.RESPUESTA_INESPERADA, detalle=f"codigo={codigo!r}"
-            ) from exc
-
-    async def _guardar(self, comando: RegistrarMaterialComando, nombre: str, sku: str) -> Material:
-        """c7 y c8: guarda el material en estado ACTIVO; si la base de datos falla, la unidad
-        de trabajo revierte y queda en el log el SKU que ya asignó Inventario."""
+    @operacion_de_negocio("CREAR_MATERIAL", RECURSO, mensaje_error_bd=ERROR_BD)
+    async def crear(self, datos: DatosMaterial) -> Resultado[Material]:
+        """POST /materiales → 201. 409 si el nombre ya existe."""
         try:
             async with self._uow:
+                await self._verificar_nombre_disponible(datos.nombre)
                 fecha = ahora()
                 material = Material(
-                    id_material=id_material(await self._materiales.siguiente_numero()),
-                    sku=sku,
-                    nombre=nombre,
-                    categoria=comando.categoria,
-                    unidad_medida=comando.unidad_medida,
-                    densidad=comando.densidad,
-                    pureza=comando.pureza,
-                    estado=EstadoMaterial.ACTIVO,
+                    nombre=datos.nombre,
+                    categoria=datos.categoria,
+                    unidad_medida=datos.unidad_medida,
+                    densidad=datos.densidad,
+                    pureza=datos.pureza,
                     fecha_registro=fecha,
                     fecha_actualizacion=fecha,
                 )
-                self._materiales.agregar(material)
-                self._auditar(OPERACION_REGISTRAR, RECURSO, material.id_material, 201, {"sku": sku})
+                await self._materiales.agregar(material)
+                self._auditar("CREAR_MATERIAL", RECURSO, str(material.id_material), 201)
                 await self._uow.commit()
         except ErrorIntegridadDatos as exc:
+            # Otra petición guardó el mismo nombre entre la verificación y el commit: el
+            # índice único lo rechaza y se responde 409 como en la verificación. Cualquier
+            # otra violación es un fallo de base de datos (500).
             if exc.restriccion != RESTRICCION_NOMBRE_UNICO:
-                self._registrar_fallo_al_guardar(sku, nombre)
                 raise
-            # Otra petición registró el mismo nombre entre la verificación (c3) y el commit.
-            logger.warning("Nombre registrado por una petición simultánea", extra={"sku": sku, "nombre": nombre})
-            raise ConflictoError(formatear(mensajes.HU01_C3, Nombre=nombre)) from exc
-        except ErrorBaseDatos:
-            self._registrar_fallo_al_guardar(sku, nombre)
-            raise
+            raise _nombre_duplicado(datos.nombre) from exc
+        self._publicar(TipoEvento.MATERIAL_CREADO, materialId=material.id_material)
+        return Resultado(material)
+
+    @operacion_de_negocio("ACTUALIZAR_MATERIAL", RECURSO, mensaje_error_bd=ERROR_BD, parametro_id="id_material")
+    async def actualizar(self, id_material: int, datos: DatosMaterial) -> Resultado[Material]:
+        """PUT /materiales/{id} → 200. 404 si no existe; 409 si el nombre lo usa otro material."""
+        try:
+            async with self._uow:
+                material = await self._obtener_o_404(id_material)
+                await self._verificar_nombre_disponible(datos.nombre, excluir_id=id_material)
+                material.nombre = datos.nombre
+                material.categoria = datos.categoria
+                material.unidad_medida = datos.unidad_medida
+                material.densidad = datos.densidad
+                material.pureza = datos.pureza
+                material.fecha_actualizacion = ahora()
+                self._auditar("ACTUALIZAR_MATERIAL", RECURSO, str(id_material), 200)
+                await self._uow.commit()
+        except ErrorIntegridadDatos as exc:
+            # Otra petición guardó el mismo nombre entre la verificación y el commit: el
+            # índice único lo rechaza y se responde 409 como en la verificación. Cualquier
+            # otra violación es un fallo de base de datos (500).
+            if exc.restriccion != RESTRICCION_NOMBRE_UNICO:
+                raise
+            raise _nombre_duplicado(datos.nombre) from exc
+        self._publicar(TipoEvento.MATERIAL_ACTUALIZADO, materialId=id_material)
+        return Resultado(material)
+
+    @operacion_de_negocio("ELIMINAR_MATERIAL", RECURSO, mensaje_error_bd=ERROR_BD, parametro_id="id_material")
+    async def eliminar(self, id_material: int) -> None:
+        """DELETE /materiales/{id} → 204. 404 si no existe."""
+        async with self._uow:
+            material = await self._obtener_o_404(id_material)
+            await self._materiales.eliminar(material)
+            self._auditar("ELIMINAR_MATERIAL", RECURSO, str(id_material), 204)
+            await self._uow.commit()
+        self._publicar(TipoEvento.MATERIAL_ELIMINADO, materialId=id_material)
+
+    # --- Consultas (no se auditan) ---------------------------------------------------
+
+    @operacion_de_negocio("LISTAR_MATERIALES", RECURSO, mensaje_error_bd=ERROR_BD, auditar=False)
+    async def obtener_todos(self) -> Resultado[Sequence[Material]]:
+        """GET /materiales → 200."""
+        async with self._uow:
+            return Resultado(await self._materiales.listar())
+
+    @operacion_de_negocio("CONSULTAR_MATERIAL", RECURSO, mensaje_error_bd=ERROR_BD, auditar=False)
+    async def obtener_por_id(self, id_material: int) -> Resultado[Material]:
+        """GET /materiales/{id} → 200. 404 si no existe."""
+        async with self._uow:
+            return Resultado(await self._obtener_o_404(id_material))
+
+    @operacion_de_negocio("BUSCAR_MATERIALES", RECURSO, mensaje_error_bd=ERROR_BD, auditar=False)
+    async def buscar_por_nombre(self, nombre: str) -> Resultado[Sequence[Material]]:
+        """GET /materiales/buscar?nombre= → 200 con los que contienen el texto (puede ser vacía)."""
+        async with self._uow:
+            return Resultado(await self._materiales.buscar_por_nombre(nombre))
+
+    # --- Auxiliares --------------------------------------------------------------------
+
+    async def _obtener_o_404(self, id_material: int) -> Material:
+        material = await self._materiales.obtener_por_id(id_material)
+        if material is None:
+            raise RecursoNoEncontradoError(formatear(mensajes.MATERIAL_NO_ENCONTRADO, id=id_material))
         return material
 
-    @staticmethod
-    def _registrar_fallo_al_guardar(sku: str, nombre: str) -> None:
-        # El traceId lo agrega el formateador del log; el detalle del error lo registra el
-        # manejador global de excepciones con el mismo traceId.
-        logger.error(
-            "No se pudo guardar el material; Inventario ya le asignó el SKU %s",
-            sku,
-            extra={"sku": sku, "nombre": nombre},
-        )
+    async def _verificar_nombre_disponible(self, nombre: str, excluir_id: int | None = None) -> None:
+        if await self._materiales.existe_nombre(nombre, excluir_id=excluir_id):
+            raise _nombre_duplicado(nombre)
+
+
+def _nombre_duplicado(nombre: str) -> ConflictoError:
+    return ConflictoError(formatear(mensajes.MATERIAL_NOMBRE_DUPLICADO, nombre=nombre))

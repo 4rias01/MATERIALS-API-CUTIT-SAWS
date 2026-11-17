@@ -16,11 +16,12 @@ select = [
     "SIM",     # simplificaciones
     "C4",      # comprensiones
     "RUF",     # reglas propias de ruff
+    "S",       # flake8-bandit: seguridad (OWASP Top 10: inyección, secretos, criptografía débil...)
 ]
 
 [tool.ruff.lint.per-file-ignores]
 # Nombres de prueba descriptivos y datos de ejemplo largos.
-"tests/**" = ["E501"]
+"tests/**" = ["E501", "S101"]  # S101: las pruebas usan assert
 
 [tool.ruff.lint.isort]
 known-first-party = ["app", "tests"]

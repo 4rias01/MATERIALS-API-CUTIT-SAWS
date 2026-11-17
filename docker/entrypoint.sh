@@ -19,4 +19,4 @@ done
 
 # Un solo proceso: las métricas de Prometheus viven en la memoria del proceso.
 # El log de acceso lo escribe el middleware de traceId (en JSON), no Uvicorn.
-exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --no-access-log
+exec uvicorn app.main:app --host 0.0.0.0 --port 8520 --no-access-log

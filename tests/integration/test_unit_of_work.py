@@ -6,74 +6,83 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engin
 
 from app.core.exceptions import ErrorBaseDatos, ErrorIntegridadDatos
 from app.infraestructure.database import crear_fabrica_sesiones, crear_motor
-from app.infraestructure.models import Material
+from app.infraestructure.models import Auditoria
+from app.infraestructure.repositories import AuditoriaRepository
 from app.infraestructure.unit_of_work import UnitOfWork
 from tests.conftest import URL_SIN_BASE_DE_DATOS, configuracion_de_prueba
-from tests.fabricas import un_material
+
+
+def un_registro(operacion: str = "PRUEBA") -> Auditoria:
+    return Auditoria(trace_id="0123456789abcdef", operacion=operacion, recurso="prueba", recurso_id="1", resultado_http=200)
 
 
 async def _contar(sesion: AsyncSession) -> int:
-    return int(await sesion.scalar(select(func.count()).select_from(Material)) or 0)
+    return int(await sesion.scalar(select(func.count()).select_from(Auditoria)) or 0)
 
 
 async def test_commit_confirma(sesion: AsyncSession, otra_sesion: AsyncSession) -> None:
     async with UnitOfWork(sesion) as uow:
-        sesion.add(un_material(1))
+        AuditoriaRepository(sesion).agregar(un_registro())
         await uow.commit()
     assert await _contar(otra_sesion) == 1
 
 
 async def test_sin_commit_se_revierte(sesion: AsyncSession, otra_sesion: AsyncSession) -> None:
     async with UnitOfWork(sesion):
-        sesion.add(un_material(1))
+        sesion.add(un_registro())
         await sesion.flush()
     assert await _contar(otra_sesion) == 0
 
 
 async def test_cambios_pendientes_sin_commit_se_revierten(sesion: AsyncSession, otra_sesion: AsyncSession) -> None:
     async with UnitOfWork(sesion):
-        sesion.add(un_material(1))
+        sesion.add(un_registro())
     assert await _contar(otra_sesion) == 0
 
 
 async def test_lo_leido_sigue_disponible_despues_del_bloque(sesion: AsyncSession, otra_sesion: AsyncSession) -> None:
     """Una consulta no debe vencer los objetos: el router los usa para armar la respuesta."""
-    await _registrar(otra_sesion, un_material(11))
+    async with UnitOfWork(otra_sesion) as uow:
+        otra_sesion.add(un_registro("LEIDO"))
+        await uow.commit()
 
     async with UnitOfWork(sesion):
-        material = await sesion.get(Material, "mat-011")
-    assert material is not None
-    assert (material.nombre, material.sku) == ("Material 11", "MP-00011")
+        registro = (await sesion.scalars(select(Auditoria))).one()
+    assert registro.operacion == "LEIDO"
     assert not sesion.in_transaction()
 
 
 async def test_una_excepcion_revierte_y_se_propaga_sin_cambios(sesion: AsyncSession, otra_sesion: AsyncSession) -> None:
     with pytest.raises(ValueError, match="regla"):
         async with UnitOfWork(sesion):
-            sesion.add(un_material(1))
+            sesion.add(un_registro())
             await sesion.flush()
             raise ValueError("regla de negocio")
     assert await _contar(otra_sesion) == 0
-    # La sesión sigue utilizable después de la reversión.
-    async with UnitOfWork(sesion) as uow:
-        sesion.add(un_material(2))
+    async with UnitOfWork(sesion) as uow:  # la sesión sigue utilizable
+        sesion.add(un_registro())
+        await uow.rollback()
+        sesion.add(un_registro())
         await uow.commit()
     assert await _contar(otra_sesion) == 1
 
 
-async def test_violacion_de_restriccion_en_el_bloque(sesion: AsyncSession) -> None:
-    await _registrar(sesion, un_material(1, nombre="Acero"))
-    with pytest.raises(ErrorIntegridadDatos) as error:
+async def test_violacion_de_restriccion_se_traduce(sesion: AsyncSession) -> None:
+    registro = un_registro()
+    registro.operacion = None  # type: ignore[assignment]  # NOT NULL
+    with pytest.raises(ErrorIntegridadDatos):
         async with UnitOfWork(sesion):
-            sesion.add(un_material(2, nombre="acero"))
+            sesion.add(registro)
             await sesion.flush()
-    assert error.value.restriccion == "uq_material_nombre_lower"
 
 
-async def _registrar(sesion: AsyncSession, *objetos: object) -> None:
-    async with UnitOfWork(sesion) as uow:
-        sesion.add_all(objetos)
-        await uow.commit()
+async def test_fallo_en_commit_se_traduce(sesion: AsyncSession) -> None:
+    registro = un_registro()
+    registro.operacion = None  # type: ignore[assignment]
+    with pytest.raises(ErrorIntegridadDatos):
+        async with UnitOfWork(sesion) as uow:
+            sesion.add(registro)
+            await uow.commit()
 
 
 async def test_timeout_de_sentencia_se_traduce_a_error_de_base_de_datos(url_base_datos: str) -> None:
