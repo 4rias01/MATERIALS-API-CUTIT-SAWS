@@ -1,0 +1,5 @@
+# Herramientas de análisis de seguridad (OWASP Top 10) que corre el job "seguridad" del CI.
+# Van aparte de requirements-dev.txt porque semgrep fija versiones de opentelemetry que
+# chocan con las de FastAPI: se instalan en un entorno sin la aplicación.
+semgrep==1.185.0
+pip-audit==2.10.1
