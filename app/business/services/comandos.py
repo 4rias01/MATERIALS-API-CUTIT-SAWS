@@ -10,8 +10,19 @@ from decimal import Decimal
 
 
 @dataclass(frozen=True, slots=True)
+class RegistrarMaterialComando:
+    """HU-01: POST /materiales."""
+
+    nombre: str
+    categoria: str
+    unidad_medida: str
+    densidad: Decimal
+    pureza: Decimal
+
+
+@dataclass(frozen=True, slots=True)
 class DatosMaterial:
-    """Campos editables de un material (POST /materiales y PUT /materiales/{id})."""
+    """Campos editables de un material (PUT /materiales/{id}, CRUD básico)."""
 
     nombre: str
     categoria: str

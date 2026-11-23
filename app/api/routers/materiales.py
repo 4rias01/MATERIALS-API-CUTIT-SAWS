@@ -1,4 +1,9 @@
-"""Rutas del recurso /materiales (CRUD básico, equivalente al ProfesorController del dojo)."""
+"""Rutas del recurso /materiales.
+
+* POST: HU-01 (registrar material).
+* GET, PUT y DELETE: CRUD básico (equivalente al ProfesorController del dojo); las
+  HU-02 a HU-04 los reemplazarán con sus propios criterios.
+"""
 
 from typing import Annotated
 
@@ -6,28 +11,34 @@ from fastapi import APIRouter, Depends, Path, Query, Response
 
 from app.api.dependencies import obtener_material_service
 from app.api.schemas.comun import mensaje_solicitud_invalida, respuestas_error
-from app.api.schemas.materiales import MaterialRespuesta, MaterialSolicitud
+from app.api.schemas.materiales import (
+    MaterialActualizarSolicitud,
+    MaterialCrearSolicitud,
+    MaterialRegistradoRespuesta,
+    MaterialRespuesta,
+)
 from app.business.domain import mensajes
 from app.business.services.material_service import MaterialService
 
 router = APIRouter(prefix="/materiales", tags=["Materiales"])
 
 Servicio = Annotated[MaterialService, Depends(obtener_material_service)]
-# Entero positivo dentro del rango de BIGINT de PostgreSQL.
-IdMaterial = Annotated[int, Path(gt=0, le=2**63 - 1, description="Id del material.")]
+# ID secuencial mat-NNN (HU-01 c7.1); el patrón evita consultar la base con valores arbitrarios.
+IdMaterial = Annotated[str, Path(pattern=r"^mat-\d{3,6}$", description="Id del material (mat-NNN).", examples=["mat-001"])]
 ID_INVALIDO = mensaje_solicitud_invalida(mensajes.formatear(mensajes.MATERIAL_CAMPO_INVALIDO, campo="id"))
 
 
 @router.post(
     "",
     status_code=201,
-    response_model=MaterialRespuesta,
-    summary="Crear material",
-    responses=respuestas_error(400, 409, 500),
+    response_model=MaterialRegistradoRespuesta,
+    summary="Registrar un material (HU-01)",
+    description="Registra el material como materia prima en Inventario, que asigna el SKU, y lo guarda en estado ACTIVO.",
+    responses=respuestas_error(400, 409, 500, 503),
 )
-async def crear(solicitud: MaterialSolicitud, servicio: Servicio) -> MaterialRespuesta:
-    resultado = await servicio.crear(solicitud.a_datos())
-    return MaterialRespuesta.desde_modelo(resultado.datos)
+async def registrar_material(solicitud: MaterialCrearSolicitud, servicio: Servicio) -> MaterialRegistradoRespuesta:
+    resultado = await servicio.registrar(solicitud.a_comando())
+    return MaterialRegistradoRespuesta.con_mensaje(resultado.datos, resultado.mensaje or "")
 
 
 @router.get("", response_model=list[MaterialRespuesta], summary="Listar materiales", responses=respuestas_error(500))
@@ -71,7 +82,7 @@ async def obtener_por_id(id_material: IdMaterial, servicio: Servicio) -> Materia
     responses=respuestas_error(400, 404, 409, 500),
     openapi_extra=ID_INVALIDO,
 )
-async def actualizar(id_material: IdMaterial, solicitud: MaterialSolicitud, servicio: Servicio) -> MaterialRespuesta:
+async def actualizar(id_material: IdMaterial, solicitud: MaterialActualizarSolicitud, servicio: Servicio) -> MaterialRespuesta:
     resultado = await servicio.actualizar(id_material, solicitud.a_datos())
     return MaterialRespuesta.desde_modelo(resultado.datos)
 
