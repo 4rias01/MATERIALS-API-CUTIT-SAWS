@@ -8,6 +8,8 @@ punto de entrada, incluidas las pruebas (patrón Service Layer).
 from dataclasses import dataclass
 from decimal import Decimal
 
+from app.business.domain.formulas import AplicacionTecnica, ComponenteFormula, NombreFormula, validar_componentes
+
 
 @dataclass(frozen=True, slots=True)
 class RegistrarMaterialComando:
@@ -29,3 +31,17 @@ class DatosMaterial:
     unidad_medida: str
     densidad: Decimal
     pureza: Decimal
+
+
+@dataclass(frozen=True, slots=True)
+class RegistrarFormulaComando:
+    """HU-05: POST /formulas. Valida también las llamadas ajenas a la API."""
+
+    nombre: str
+    aplicacion_tecnica: str
+    componentes: tuple[ComponenteFormula, ...]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "nombre", NombreFormula.crear(self.nombre).valor)
+        AplicacionTecnica(self.aplicacion_tecnica)
+        validar_componentes(self.componentes)
