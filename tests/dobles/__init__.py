@@ -1,6 +1,23 @@
-"""Dobles de prueba (patrón Test Double) de las interfaces de la capa de acceso a datos."""
+"""Dobles de prueba (patrón Test Double) de las interfaces de la capa de acceso a datos.
 
-from tests.dobles.clientes import ClienteExternoFalso
-from tests.dobles.repositorios import AuditoriaRepositoryFalso, UnitOfWorkFalsa
+Permiten probar los servicios sin base de datos ni APIs externas::
 
-__all__ = ["AuditoriaRepositoryFalso", "ClienteExternoFalso", "UnitOfWorkFalsa"]
+    uow = UnitOfWorkFalsa()
+    materiales = MaterialRepositoryFalso()
+    inventario = InventarioClientFalso(sku="MP-00001")
+    servicio = MaterialService(uow, AuditoriaRepositoryFalso(), BusEventos(), materiales, inventario)
+
+Los repositorios guardan en memoria y no simulan el rollback: para probar una
+reversión, verificar ``uow.confirmaciones`` y ``uow.reversiones``.
+"""
+
+from tests.dobles.clientes import ClienteExternoFalso, InventarioClientFalso
+from tests.dobles.repositorios import AuditoriaRepositoryFalso, MaterialRepositoryFalso, UnitOfWorkFalsa
+
+__all__ = [
+    "AuditoriaRepositoryFalso",
+    "ClienteExternoFalso",
+    "InventarioClientFalso",
+    "MaterialRepositoryFalso",
+    "UnitOfWorkFalsa",
+]

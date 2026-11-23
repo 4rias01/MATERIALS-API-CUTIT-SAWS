@@ -69,3 +69,18 @@ forbidden_modules = [
     "sqlalchemy",
     "httpx",
 ]
+
+# Los servicios reciben sus dependencias por inyección (app/api/dependencies.py) y solo
+# conocen las interfaces de app.infraestructure.interfaces. Importar una implementación
+# concreta (repositorio, unidad de trabajo, cliente HTTP o motor de base de datos) hace
+# fallar el CI.
+[[tool.importlinter.contracts]]
+name = "Los servicios dependen de interfaces, no de implementaciones concretas"
+type = "forbidden"
+source_modules = ["app.business"]
+forbidden_modules = [
+    "app.infraestructure.repositories",
+    "app.infraestructure.unit_of_work",
+    "app.infraestructure.clients",
+    "app.infraestructure.database",
+]

@@ -9,7 +9,9 @@ if TYPE_CHECKING:
 DESCRIPCION = """
 API REST del módulo **Materiales y Fórmulas** de la plataforma backend de Cutit Saws Ltd.
 
-* **Materiales**: CRUD básico (crear, listar, buscar por id o por nombre, actualizar y eliminar).
+* **Materiales**: registrar un material nuevo (HU-01), que también se registra como
+  materia prima en Inventario; y CRUD básico (listar, buscar por id o por nombre,
+  actualizar y eliminar).
 
 **Formato de las respuestas**
 
@@ -25,7 +27,7 @@ API REST del módulo **Materiales y Fórmulas** de la plataforma backend de Cuti
 """
 
 ETIQUETAS = [
-    {"name": "Materiales", "description": "CRUD básico de materiales."},
+    {"name": "Materiales", "description": "Catálogo de materiales (HU-01 y CRUD básico)."},
     {"name": "Monitoreo", "description": "Estado de la API (/health). Las métricas están en /metrics."},
 ]
 

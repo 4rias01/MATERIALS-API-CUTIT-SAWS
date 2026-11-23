@@ -1,11 +1,32 @@
 """Catálogo de mensajes, utilidades de formato y errores del dominio."""
 
+import re
+
 import pytest
 
 from app.business.domain import mensajes
 from app.business.domain.errores import ErrorDominio, Motivo, ValorInvalidoError
 
 PLANTILLA = "Material '[Nombre]' registrado exitosamente con el SKU [SKU]."
+
+
+def _constantes_del_backlog() -> dict[str, str]:
+    return {k: v for k, v in vars(mensajes).items() if re.fullmatch(r"HU\d{2}_C\w+", k)}
+
+
+def test_el_catalogo_tiene_los_17_mensajes_de_hu01() -> None:
+    constantes = {k: v for k, v in _constantes_del_backlog().items() if k.startswith("HU01")}
+    assert len(constantes) == 17
+    assert all(isinstance(v, str) and v.strip() == v and v for v in constantes.values())
+
+
+def test_mensajes_de_hu01_con_marcadores() -> None:
+    assert mensajes.formatear(mensajes.HU01_C7, Nombre="Acero", SKU="MP-00001") == (
+        "Material 'Acero' registrado exitosamente con el SKU MP-00001."
+    )
+    assert mensajes.formatear(mensajes.HU01_C3, {"Nombre": "Acero"}).startswith("El material con el nombre 'Acero'")
+    assert mensajes.marcadores(mensajes.HU01_C2_3_B) == ["valor"]
+    assert mensajes.formatear(mensajes.HU01_C8) == mensajes.HU01_C8
 
 
 def test_formatear_reemplaza_los_marcadores() -> None:
