@@ -27,6 +27,7 @@ API REST del módulo **Materiales y Fórmulas** de la plataforma backend de Cuti
 """
 
 ETIQUETAS = [
+    {"name": "Fórmulas", "description": "Registro de fórmulas en BORRADOR (HU-05)."},
     {"name": "Materiales", "description": "Catálogo de materiales (HU-01 y CRUD básico)."},
     {"name": "Monitoreo", "description": "Estado de la API (/health). Las métricas están en /metrics."},
 ]

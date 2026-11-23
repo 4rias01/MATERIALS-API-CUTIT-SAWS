@@ -5,7 +5,8 @@ Importar desde aquí garantiza que todas las tablas queden registradas en
 """
 
 from app.infraestructure.models.auditoria import Auditoria
-from app.infraestructure.models.base import SECUENCIA_MATERIAL, Base
+from app.infraestructure.models.base import SECUENCIA_FORMULA, SECUENCIA_MATERIAL, Base
+from app.infraestructure.models.formula import Formula, FormulaComponente
 from app.infraestructure.models.material import Material
 
-__all__ = ["SECUENCIA_MATERIAL", "Auditoria", "Base", "Material"]
+__all__ = ["SECUENCIA_FORMULA", "SECUENCIA_MATERIAL", "Auditoria", "Base", "Formula", "FormulaComponente", "Material"]

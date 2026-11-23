@@ -61,6 +61,34 @@ HU01_C7 = "Material '[Nombre]' registrado exitosamente con el SKU [SKU]."
 HU01_C8 = "Error interno de conexión con la base de datos. Por favor reintente más tarde"
 
 
+# HU-05 · Registrar fórmula --------------------------------------------------------------
+HU05_C2_1 = "El campo 'Nombre' es obligatorio. Por favor, ingréselo e intente nuevamente."
+HU05_C2_2 = "El campo 'Aplicación técnica' es obligatorio. Por favor, ingréselo e intente nuevamente."
+HU05_C2_3 = (
+    "La fórmula debe estar compuesta por mínimo 2 materiales diferentes. "
+    "Por favor, agregue los componentes e intente nuevamente."
+)
+HU05_C2_4 = "El campo 'Cantidad' del material '[IDMaterial]' es obligatorio. Por favor, ingréselo e intente nuevamente."
+HU05_C3_1 = "La cantidad del material '[IDMaterial]' debe ser un número mayor que 0. Valor recibido: [Cantidad]."
+HU05_C3_2 = (
+    "La cantidad del material '[IDMaterial]' admite máximo 6 dígitos enteros y 3 decimales. Valor recibido: [Cantidad]."
+)
+HU05_C4_1 = "La fórmula no puede registrarse. Los siguientes componentes no existen: [Lista de Materiales]."
+HU05_C4_2 = "La fórmula no puede registrarse. Los siguientes componentes están en estado INACTIVO: [Lista de Materiales]."
+HU05_C5 = (
+    "La cantidad del material '[NombreMaterial]' debe ser un número entero, "
+    "porque su unidad de medida es Unidad (und). Valor recibido: [Cantidad]."
+)
+HU05_C6_1 = "Ya existe una fórmula registrada con el nombre '[NombreIngresado]'. Indique un nombre único para la receta."
+HU05_C6_2 = "Fórmula '[Nombre]' registrada exitosamente en estado BORRADOR con el código [form-NNN]."
+HU05_C8 = "Error interno de conexión con la base de datos al registrar la fórmula. Por favor, reintente más tarde."
+HU05_C9_1_A = "El campo 'Nombre' admite máximo 80 caracteres."
+HU05_C9_1_B = "El campo 'Nombre' solo admite letras y espacios."
+HU05_C9_2 = "El campo 'Aplicación técnica' admite máximo 200 caracteres."
+HU05_C9_3 = "El material '[IDMaterial]' está repetido en la tabla de Componentes. Cada material debe aparecer una sola vez."
+HU05_C9_4 = "El campo 'Unidad de medida' es de solo lectura: el sistema la toma del material registrado."
+
+
 # CRUD básico de materiales ----------------------------------------------------------------
 # No están en el backlog: son los del CRUD de ejemplo (equivalente al de profesores del dojo).
 # El alta (POST /materiales) ya no es del CRUD: la cubre HU-01 con sus propios mensajes.

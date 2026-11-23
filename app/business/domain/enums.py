@@ -31,3 +31,13 @@ class EstadoMaterial(StrEnum):
 
     ACTIVO = "ACTIVO"
     INACTIVO = "INACTIVO"
+
+
+class EstadoFormula(StrEnum):
+    """Estados definidos en HU-05 c7.2; el registro solo crea BORRADOR."""
+
+    BORRADOR = "BORRADOR"
+    EVALUANDO_PATENTE = "EVALUANDO_PATENTE"
+    APROBADA = "APROBADA"
+    RECHAZADA_POR_INFRACCION = "RECHAZADA_POR_INFRACCION"
+    DESCONTINUADA = "DESCONTINUADA"
