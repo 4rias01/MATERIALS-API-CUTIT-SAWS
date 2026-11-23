@@ -21,9 +21,49 @@ from collections.abc import Mapping
 # Mensajes de las historias de usuario ---------------------------------------------------
 # (se agregan aquí a medida que se implementan las historias)
 
+# HU-01 · Registrar material -------------------------------------------------------------
+# c2.1 · 400
+HU01_C2_1 = "El campo 'Nombre' es obligatorio. Por favor, ingréselo e intente nuevamente."
+# c2.2 · 400
+HU01_C2_2_A = "El campo 'Nombre' debe tener entre 3 y 100 caracteres."
+# c2.2 · 400
+HU01_C2_2_B = "El campo 'Nombre' contiene caracteres no permitidos."
+# c2.3 · 400
+HU01_C2_3_A = "El campo 'Categoría' es obligatorio. Por favor, ingréselo e intente nuevamente."
+# c2.3 · 400 · marcadores: [valor]
+HU01_C2_3_B = "La Categoría '[valor]' no es válida. Valores permitidos: Materia Prima, Componentes o Lubricantes."
+# c2.4 · 400
+HU01_C2_4_A = "El campo 'Unidad de medida' es obligatorio. Por favor, ingréselo e intente nuevamente."
+# c2.4 · 400 · marcadores: [valor]
+HU01_C2_4_B = "La Unidad de medida '[valor]' no es válida. Valores permitidos: und, g, kg, mL, L o m."
+# c2.5 · 400
+HU01_C2_5_A = "El campo 'Densidad' es obligatorio. Por favor, ingréselo e intente nuevamente."
+# c2.5 · 400
+HU01_C2_5_B = "El campo 'Densidad' debe ser un número positivo de máximo 4 caracteres."
+# c2.6 · 400
+HU01_C2_6_A = "El campo 'Pureza' es obligatorio. Por favor, ingréselo e intente nuevamente."
+# c2.6 · 400
+HU01_C2_6_B = "El campo 'Pureza' debe ser un número entre 0 y 100 de máximo 3 caracteres."
+# c3 · 409 · marcadores: [Nombre]
+HU01_C3 = "El material con el nombre '[Nombre]' ya se encuentra registrado en el catálogo."
+# c5 · texto que responde Inventario (no lo devuelve esta API) · marcadores: [Nombre]
+HU01_C5_RESPUESTA_INVENTARIO = "Ya existe un artículo con el nombre [Nombre]"
+# c5 · 409 · marcadores: [Nombre]
+HU01_C5 = (
+    "Inventario ya tiene registrado un artículo con el nombre '[Nombre]'. Indique un nombre "
+    "diferente para el material."
+)
+# c6 · 503
+HU01_C6 = "Error de comunicación con el módulo Inventario al registrar el material. Por favor reintente más tarde"
+# c7 · 201 · marcadores: [Nombre], [SKU]
+HU01_C7 = "Material '[Nombre]' registrado exitosamente con el SKU [SKU]."
+# c8 · 500
+HU01_C8 = "Error interno de conexión con la base de datos. Por favor reintente más tarde"
+
 
 # CRUD básico de materiales ----------------------------------------------------------------
 # No están en el backlog: son los del CRUD de ejemplo (equivalente al de profesores del dojo).
+# El alta (POST /materiales) ya no es del CRUD: la cubre HU-01 con sus propios mensajes.
 
 # 400 · marcadores: [campo]
 MATERIAL_CAMPO_INVALIDO = "El campo '[campo]' es obligatorio o no tiene un formato válido."
