@@ -22,7 +22,14 @@ from app.business.services.material_service import MaterialService
 from app.business.services.salud_service import SaludService
 from app.core.config import Configuracion
 from app.core.events import BusEventos
-from app.infraestructure.interfaces import IAuditoriaRepository, IClienteExterno, IMaterialRepository, IUnitOfWork
+from app.infraestructure.clients.inventario_client import SERVICIO as SERVICIO_INVENTARIO
+from app.infraestructure.interfaces import (
+    IAuditoriaRepository,
+    IClienteExterno,
+    IInventarioClient,
+    IMaterialRepository,
+    IUnitOfWork,
+)
 from app.infraestructure.repositories import AuditoriaRepository, MaterialRepository
 from app.infraestructure.unit_of_work import UnitOfWork
 
@@ -40,6 +47,10 @@ def obtener_bus_eventos(request: Request) -> BusEventos:
 def obtener_clientes_externos(request: Request) -> Mapping[str, IClienteExterno]:
     """Clientes de las APIs de otras células, por nombre de servicio."""
     return request.app.state.clientes_externos
+
+
+def obtener_cliente_inventario(request: Request) -> IInventarioClient:
+    return request.app.state.clientes_externos[SERVICIO_INVENTARIO]
 
 
 # --- Por petición -----------------------------------------------------------------------

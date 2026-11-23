@@ -124,7 +124,7 @@ async def test_rechaza_campos_no_permitidos(app: FastAPI, cliente: httpx.AsyncCl
 async def test_health_responde_503_si_la_base_de_datos_no_responde(cliente: httpx.AsyncClient) -> None:
     r = await cliente.get("/health")
     assert r.status_code == 503
-    assert r.json() == {"estado": "DEGRADADO", "version": "0.1.0", "baseDatos": "ERROR", "circuitos": {}}
+    assert r.json() == {"estado": "DEGRADADO", "version": "0.1.0", "baseDatos": "ERROR", "circuitos": {"inventario": "CERRADO"}}
 
 
 async def test_health_muestra_el_circuito_de_cada_cliente_externo(app: FastAPI, cliente: httpx.AsyncClient) -> None:
