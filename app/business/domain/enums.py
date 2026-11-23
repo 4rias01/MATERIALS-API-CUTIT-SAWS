@@ -8,7 +8,7 @@ from enum import StrEnum
 
 
 class Categoria(StrEnum):
-    """Categoría del material."""
+    """Categoría del material (HU-01 c1)."""
 
     MATERIA_PRIMA = "Materia Prima"
     COMPONENTES = "Componentes"
@@ -16,7 +16,7 @@ class Categoria(StrEnum):
 
 
 class UnidadMedida(StrEnum):
-    """Unidad de medida del material."""
+    """Unidad de medida del material (HU-01 c1)."""
 
     UNIDAD = "und"
     GRAMO = "g"
@@ -24,3 +24,10 @@ class UnidadMedida(StrEnum):
     MILILITRO = "mL"
     LITRO = "L"
     METRO = "m"
+
+
+class EstadoMaterial(StrEnum):
+    """Estado del material: se registra en ACTIVO (HU-01 c7.3)."""
+
+    ACTIVO = "ACTIVO"
+    INACTIVO = "INACTIVO"

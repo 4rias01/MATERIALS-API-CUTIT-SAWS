@@ -21,13 +21,27 @@ if config.config_file_name is not None:
 
 target_metadata = Base.metadata
 
+# Tablas que existen en la base a propósito sin modelo ORM: el autogenerate no las borra
+# ni las compara. material_crud_respaldo: filas del CRUD básico (migración 0003).
+TABLAS_SIN_MODELO = {"material_crud_respaldo"}
+
+
+def _incluir_objeto(objeto: object, nombre: str | None, tipo: str, reflejado: bool, comparar_con: object) -> bool:
+    return not (tipo == "table" and nombre in TABLAS_SIN_MODELO)
+
 
 def _url() -> str:
     return config.get_main_option("sqlalchemy.url") or obtener_configuracion().url_base_datos
 
 
 def _configurar(**opciones: object) -> None:
-    context.configure(target_metadata=target_metadata, compare_type=True, compare_server_default=True, **opciones)
+    context.configure(
+        target_metadata=target_metadata,
+        compare_type=True,
+        compare_server_default=True,
+        include_object=_incluir_objeto,
+        **opciones,
+    )
 
 
 def run_migrations_offline() -> None:

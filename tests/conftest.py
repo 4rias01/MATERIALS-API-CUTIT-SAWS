@@ -34,6 +34,7 @@ def configuracion_de_prueba(**valores: object) -> Configuracion:
         "log_nivel": "WARNING",
         "database_url": URL_SIN_BASE_DE_DATOS,
         "db_timeout_s": 2.0,
+        "inventario_url": "http://inventario.prueba",
     }
     base.update(valores)
     return Configuracion(_env_file=None, **base)  # type: ignore[call-arg]
