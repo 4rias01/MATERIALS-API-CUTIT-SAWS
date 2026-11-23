@@ -82,15 +82,20 @@ RepositorioAuditoria = Annotated[IAuditoriaRepository, Depends(obtener_repositor
 RepositorioMateriales = Annotated[IMaterialRepository, Depends(obtener_repositorio_materiales)]
 Eventos = Annotated[BusEventos, Depends(obtener_bus_eventos)]
 ClientesExternos = Annotated[Mapping[str, IClienteExterno], Depends(obtener_clientes_externos)]
+ClienteInventario = Annotated[IInventarioClient, Depends(obtener_cliente_inventario)]
 
 
 # --- Servicios ---------------------------------------------------------------------------
 
 
 def obtener_material_service(
-    uow: UnidadDeTrabajo, auditoria: RepositorioAuditoria, eventos: Eventos, materiales: RepositorioMateriales
+    uow: UnidadDeTrabajo,
+    auditoria: RepositorioAuditoria,
+    eventos: Eventos,
+    materiales: RepositorioMateriales,
+    inventario: ClienteInventario,
 ) -> MaterialService:
-    return MaterialService(uow, auditoria, eventos, materiales)
+    return MaterialService(uow, auditoria, eventos, materiales, inventario)
 
 
 def obtener_salud_service(uow: UnidadDeTrabajo, clientes: ClientesExternos) -> SaludService:
