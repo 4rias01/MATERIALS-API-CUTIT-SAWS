@@ -3,21 +3,22 @@
 API REST de la célula 1 de la plataforma backend de Cutit Saws (Desarrollo de Software II, 2026-2).
 Implementa el **DAS v1.2** del módulo y el **product backlog V1.3**.
 
-> **Estado: arquetipo + CRUD básico de materiales.** La infraestructura transversal funciona y
-> hay un **CRUD básico de `/materiales`** (equivalente al CRUD de profesores del dojo de Java)
-> con pruebas unitarias y de integración. **Aún no hay historias de usuario implementadas**:
-> cada historia se agrega siguiendo la sección 4.
+> **Estado: arquetipo + HU-01 (registrar material) + CRUD básico de materiales.** La
+> infraestructura transversal funciona, **HU-01 está implementada de punta a punta** (es el
+> ejemplo de referencia para las demás historias, sección 4) y el resto de `/materiales`
+> (consultar, actualizar y eliminar) es el CRUD básico del dojo, que reemplazarán HU-02 a HU-04.
 
 | Funciona hoy | Pendiente |
 |---|---|
-| Arquitectura en capas, inyección de dependencias, configuración por variables de entorno | HU-01 a HU-11 (rutas, DTO, servicios, tablas, clientes y pruebas) |
-| CRUD básico de materiales: crear, listar, buscar por id o por nombre, actualizar y eliminar | Clientes de Inventario y Patent Sweep (contrato POR ACORDAR, sección 11) |
+| Arquitectura en capas, inyección de dependencias, configuración por variables de entorno | HU-02 a HU-11 (rutas, DTO, servicios, tablas, clientes y pruebas) |
+| HU-01 completa: DTO con los mensajes del criterio 2, servicio, repositorio y alta en Inventario | Contrato POR ACORDAR con Inventario y Patent Sweep (sección 11) |
+| CRUD básico de materiales: listar, buscar por id o por nombre, actualizar y eliminar | |
 | Modelos ORM y migraciones Alembic de `auditoria` y `material` | |
 | Unidad de trabajo (commit/rollback, timeout de 5 s), auditoría, eventos de dominio | |
-| Cliente HTTP base (timeout de 5 s, circuit breaker, traceId) | |
+| Cliente HTTP base (timeout de 5 s, circuit breaker, traceId) y cliente de Inventario | |
 | traceId, logs JSON, manejador global de errores, `/health`, `/metrics`, Swagger | |
 | Dockerfile, Docker Compose, Prometheus, Grafana, node-exporter, GitHub Actions, SonarCloud | |
-| Pruebas unitarias y de integración (CRUD de materiales e infraestructura; cobertura ~97 %) | |
+| Pruebas unitarias, de integración y de aceptación de HU-01 (`tests/hu`) | |
 | Análisis de seguridad en el CI: reglas de Bandit en ruff, Semgrep (OWASP Top 10) y pip-audit | |
 
 ---
@@ -43,23 +44,24 @@ app/
 │   └── dependencies.py         Inyección de dependencias (raíz de composición)
 ├── business/                   Capa de lógica de negocio
 │   ├── services/               base.py (transacción, auditoría, errores) · comandos.py · material_service.py · salud_service.py
-│   └── domain/                 enums · errores · eventos · mensajes
+│   └── domain/                 enums · errores · eventos · mensajes · value_objects
 └── infraestructure/            Capa de acceso a datos
-    ├── interfaces/             Contratos que usan los servicios (repositorios, cliente, unidad de trabajo)
+    ├── interfaces/             Contratos que usan los servicios (repositorios, clientes, unidad de trabajo)
     ├── repositories/           Implementaciones con SQLAlchemy
     ├── models/                 Modelos ORM (auditoria y material)
-    ├── clients/                Cliente HTTP base + circuit breaker
+    ├── clients/                Cliente HTTP base + circuit breaker + cliente de Inventario
     ├── unit_of_work.py         Transacción: commit / rollback
     └── database.py             Motor, pool de conexiones y timeouts
 migrations/                     Migraciones versionadas (Alembic)
 tests/
 ├── conftest.py                 Fixtures comunes: app, cliente HTTP en memoria, configuración de prueba
-├── unit/                       Sin base de datos: MaterialService (repositorio simulado con AsyncMock), API,
-│                               manejador de errores, cliente HTTP y circuit breaker, servicio base, logging
-├── integration/                Contra PostgreSQL (TEST_DATABASE_URL): API de materiales, unidad de trabajo,
-│                               /health y migraciones; conftest.py aplica las migraciones
-├── hu/                         Una o más pruebas por criterio de aceptación (vacío por ahora)
-└── dobles/                     Unidad de trabajo, auditoría y cliente externo en memoria (Test Double)
+├── unit/                       Sin base de datos: MaterialService (repositorio simulado con AsyncMock), rutas,
+│                               objetos de valor, API, manejador de errores, clientes HTTP, servicio base, logging
+├── integration/                Contra PostgreSQL (TEST_DATABASE_URL): API de materiales, repositorio y
+│                               restricciones, unidad de trabajo, /health y migraciones
+├── hu/                         Una o más pruebas por criterio de aceptación (hoy, HU-01)
+├── fabricas.py                 Objetos del modelo con valores válidos para las pruebas
+└── dobles/                     Unidad de trabajo, repositorios y clientes en memoria (Test Double)
 monitoring/                     prometheus.yml y aprovisionamiento + tablero de Grafana
 .github/workflows/ci.yml        Integración continua (develop): ruff, mypy, import-linter, pruebas, SonarCloud
 .github/workflows/cd.yml        Despliegue continuo (main): imagen en GHCR y despliegue en EC2
@@ -99,20 +101,30 @@ predecibles: API 8520, PostgreSQL 5520, Prometheus 9520, Grafana 3820 y node-exp
 y Prometheus y Grafana únicamente en `127.0.0.1`. En desarrollo PostgreSQL se publica en
 `127.0.0.1:POSTGRES_PUERTO_HOST` (5533 en `.env.example`).
 
-### CRUD de materiales
+### Materiales
 
-| Método y ruta | Respuesta |
-|---|---|
-| `POST /materiales` | 201 con el material creado · 400 datos no válidos · 409 nombre repetido |
-| `GET /materiales` | 200 con la lista |
-| `GET /materiales/buscar?nombre=` | 200 con los que contienen el texto (sin distinguir mayúsculas) |
-| `GET /materiales/{id}` | 200 · 404 si no existe |
-| `PUT /materiales/{id}` | 200 con el material actualizado · 404 · 409 nombre de otro material |
-| `DELETE /materiales/{id}` | 204 · 404 |
+| Método y ruta | Origen | Respuesta |
+|---|---|---|
+| `POST /materiales` | **HU-01** | 201 con el material y el mensaje de c7 · 400 (mensaje de c2) · 409 nombre repetido en el catálogo (c3) o en Inventario (c5) · 503 Inventario no disponible (c6) · 500 base de datos (c8) |
+| `GET /materiales` | CRUD | 200 con la lista |
+| `GET /materiales/buscar?nombre=` | CRUD | 200 con los que contienen el texto (sin distinguir mayúsculas) |
+| `GET /materiales/{id}` | CRUD | 200 · 400 id sin formato `mat-NNN` · 404 si no existe |
+| `PUT /materiales/{id}` | CRUD | 200 con el material actualizado · 404 · 409 nombre de otro material |
+| `DELETE /materiales/{id}` | CRUD | 204 · 404 |
 
-Cuerpo de POST y PUT: `{"nombre", "categoria", "unidadMedida", "densidad", "pureza"}`. El id lo
-asigna la base de datos; en PUT va en la ruta, y cualquier campo extra (incluido `id`) se
-rechaza con 400.
+Cuerpo de POST y PUT: `{"nombre", "categoria", "unidadMedida", "densidad", "pureza"}`. El ID
+(`mat-NNN`), el SKU (lo asigna Inventario) y el estado (`ACTIVO` al registrar) son de solo
+lectura: cualquier campo extra se rechaza con 400. El material se devuelve con `materialId`,
+`sku`, los cinco campos, `estado`, `fechaRegistro` y `fechaUltimaActualizacion`.
+
+Ejemplo de HU-01 (Inventario debe estar configurado en `INVENTARIO_URL`; si no, responde 503):
+
+```bash
+curl -s -X POST localhost:$API_PUERTO_HOST/materiales -H 'Content-Type: application/json' \
+  -d '{"nombre": "Acero al carbono 1045", "categoria": "Materia Prima", "unidadMedida": "kg", "densidad": 7.85, "pureza": 98}'
+# 201 {"materialId": "mat-001", "sku": "MP-00001", ..., "estado": "ACTIVO",
+#      "mensaje": "Material 'Acero al carbono 1045' registrado exitosamente con el SKU MP-00001."}
+```
 
 ### API en Python, base de datos en Docker (para desarrollar)
 
@@ -164,21 +176,21 @@ docker compose exec postgres sh -c 'createdb -U "$POSTGRES_USER" materiales_form
 
 ## 4. Cómo implementar una historia de usuario
 
-Cada historia recorre los mismos archivos (ejemplo con HU-01, registrar material):
+HU-01 es el ejemplo de referencia: cada historia nueva recorre los mismos archivos.
 
-| Paso | Dónde |
-|---|---|
-| 1. Mensajes literales del backlog | `app/business/domain/mensajes.py` (`HU01_*`) |
-| 2. Reglas del dominio (objetos de valor, enums) | `app/business/domain/` (p. ej. `value_objects.py`, `enums.py`) |
-| 3. Tabla y migración (si hace falta) | `infraestructure/models/<tabla>.py` (importarla en `models/__init__.py`) + `alembic revision --autogenerate` |
-| 4. Contrato del repositorio y su implementación | `infraestructure/interfaces/` y `infraestructure/repositories/` |
-| 5. Cliente de otra célula (si hace falta) | Interfaz que hereda de `IClienteExterno` + clase que hereda de `ClienteHttpBase`; registrarlo en `app.state.clientes_externos` (`main.py`) |
-| 6. Comando de entrada del caso de uso | `app/business/services/comandos.py` |
-| 7. Servicio | `app/business/services/<recurso>_service.py`, heredando de `ServicioBase` |
-| 8. DTO de entrada y salida | `app/api/schemas/<recurso>.py`, heredando de `EsquemaEntrada` / `EsquemaSalida` |
-| 9. Ruta | `app/api/routers/<recurso>.py` + `include_router` en `main.py` + etiqueta en `core/openapi.py` |
-| 10. Inyección de dependencias | `obtener_<recurso>_service` en `app/api/dependencies.py` |
-| 11. Pruebas de aceptación | `tests/hu/test_huXX_*.py` (y los dobles que haga falta en `tests/dobles`) |
+| Paso | Dónde | HU-01 (ejemplo) |
+|---|---|---|
+| 1. Mensajes literales del backlog | `app/business/domain/mensajes.py` | `HU01_C2_1` … `HU01_C8` |
+| 2. Reglas del dominio (objetos de valor, enums) | `app/business/domain/` | `NombreMaterial`, `Densidad`, `Pureza`, `Sku`, `EstadoMaterial` |
+| 3. Tabla y migración (si hace falta) | `infraestructure/models/<tabla>.py` (importarla en `models/__init__.py`) + `alembic revision --autogenerate` | `models/material.py` + `0003_material_hu01.py` |
+| 4. Contrato del repositorio y su implementación | `infraestructure/interfaces/` y `infraestructure/repositories/` | `existe_nombre`, `siguiente_numero`, `agregar` |
+| 5. Cliente de otra célula (si hace falta) | Interfaz que hereda de `IClienteExterno` + clase que hereda de `ClienteHttpBase`; registrarlo en `app.state.clientes_externos` (`main.py`) | `IInventarioClient` + `InventarioClient` |
+| 6. Comando de entrada del caso de uso | `app/business/services/comandos.py` | `RegistrarMaterialComando` |
+| 7. Servicio | `app/business/services/<recurso>_service.py`, heredando de `ServicioBase` | `MaterialService.registrar` |
+| 8. DTO de entrada y salida | `app/api/schemas/<recurso>.py`, heredando de `EsquemaEntrada` / `EsquemaSalida` | `MaterialCrearSolicitud`, `MaterialRegistradoRespuesta` |
+| 9. Ruta | `app/api/routers/<recurso>.py` + `include_router` en `main.py` + etiqueta en `core/openapi.py` | `POST /materiales` |
+| 10. Inyección de dependencias | `obtener_<recurso>_service` en `app/api/dependencies.py` | `obtener_material_service`, `obtener_cliente_inventario` |
+| 11. Pruebas de aceptación | `tests/hu/test_huXX_*.py` (y los dobles que haga falta en `tests/dobles`) | `tests/hu/test_hu01_registrar_material.py` |
 
 **Validación de entrada (400).** En el DTO, la tabla `mensajes_error` asocia cada
 `(campo en camelCase, tipo de error de Pydantic)` con su mensaje (`"*"` = cualquier error del
@@ -197,7 +209,7 @@ class MaterialService(ServicioBase):
                 raise ConflictoError(formatear(mensajes.HU01_C3, Nombre=comando.nombre))
         ...
         async with self._uow:
-            self._materiales.agregar(material)
+            await self._materiales.agregar(material)
             self._auditar("REGISTRAR_MATERIAL", "material", material.id_material, 201)
             await self._uow.commit()
         self._publicar(TipoEvento.MATERIAL_REGISTRADO, materialId=material.id_material)
@@ -211,8 +223,9 @@ rechazos en la auditoría. Mientras una ruta exista sin su lógica, el servicio 
 
 **Pruebas.** `tests/hu/test_huXX_*.py` con una prueba por criterio (código HTTP y mensaje).
 Para probar sin base de datos, reemplazar el servicio o sus dependencias con
-`app.dependency_overrides` y los dobles de `tests/dobles`. Al agregar una tabla, sumarla a
-`TABLAS` en `tests/integration/conftest.py`. `pytest` en
+`app.dependency_overrides` y los dobles de `tests/dobles` (como el fixture `escenario` de
+HU-01). Al agregar una tabla o secuencia, sumarla a `TABLAS` o `SECUENCIAS` en
+`tests/integration/conftest.py`. `pytest` en
 verde y Pull Request con la plantilla.
 
 ---
@@ -225,12 +238,19 @@ alembic revision --autogenerate -m "cambio"   # nueva migración después de cam
 alembic check                                 # falla si modelos y migraciones difieren
 ```
 
-- Tablas: `auditoria` (0001) y `material` (0002, CRUD básico). Las del MER se agregan con
-  nuevas migraciones cuando se implementen sus historias.
-- `material`: id `BIGINT GENERATED ALWAYS AS IDENTITY`, nombre único sin distinguir
-  mayúsculas (índice `lower(nombre)`), restricciones CHECK de categoría, unidad de medida,
-  densidad (> 0) y pureza (0 a 100).
+- Tablas: `auditoria` (0001) y `material` (0003, HU-01). Las del MER se agregan con nuevas
+  migraciones cuando se implementen sus historias.
+- `material`: ID `mat-NNN` desde la secuencia `seq_material` de PostgreSQL (mínimo 3
+  dígitos; una transacción revertida deja un salto en la numeración), SKU único, estado
+  (`ACTIVO`/`INACTIVO`), nombre único sin distinguir mayúsculas (índice `lower(nombre)`) y
+  restricciones CHECK de categoría, unidad de medida, densidad (> 0), pureza (0 a 100) y estado.
 - Fechas `TIMESTAMP WITH TIME ZONE` (UTC), devueltas en ISO 8601.
+
+> La migración `0003` reemplaza la tabla `material` del CRUD básico (`0002`, ID numérico, sin
+> SKU ni estado). Sus filas no se pueden convertir porque el SKU solo lo asigna Inventario, así
+> que no se borran: quedan en `material_crud_respaldo` (sin modelo ORM; `migrations/env.py`
+> la excluye del autogenerate). El downgrade a `0002` la restaura. Cuando el equipo confirme
+> que no se necesitan, se elimina con una migración nueva.
 
 > La migración `0001` se reescribió para dejar solo la tabla `auditoria`. Si tienen una base
 > local creada con una versión anterior, recréenla: `docker compose down -v` y
@@ -240,8 +260,13 @@ alembic check                                 # falla si modelos y migraciones d
 
 ## 6. Integración con otras células
 
-Aún no hay clientes concretos: se crean con la primera historia que llame a otra célula.
-Las URLs base ya se configuran con `INVENTARIO_URL` y `PATENT_SWEEP_URL`.
+| | Inventario (célula 4) |
+|---|---|
+| Este módulo llama | `POST /inventario/materias-primas` (HU-01 c4) |
+| Configuración | `INVENTARIO_URL`, `INVENTARIO_RUTA_MATERIAS_PRIMAS` |
+| Contrato por acordar | Nombres de los campos JSON y código HTTP del nombre repetido: constantes en `app/infraestructure/clients/inventario_client.py` |
+
+Patent Sweep aún no tiene cliente: se crea con HU-09 (su URL ya se configura con `PATENT_SWEEP_URL`).
 
 Todo cliente hereda de `ClienteHttpBase` (`app/infraestructure/clients/base.py`), así que sus
 llamadas salientes tienen timeout total de 5 s, circuit breaker (5 fallos seguidos
@@ -371,10 +396,25 @@ que verificar.
 
 ### POR ACORDAR con otras células
 
-1. **Inventario**: rutas, nombres de los campos JSON y códigos HTTP de las operaciones que
-   use cada historia.
+1. **Inventario**: nombres de los campos JSON del alta, campo con el Código de artículo en la
+   respuesta y código HTTP con que rechaza un nombre repetido (se asumió 409; constantes en
+   `inventario_client.py`). Rutas y contratos de las operaciones de las demás historias.
 2. **Patent Sweep** (HU-09): ruta y contrato de la solicitud de evaluación.
 3. URLs de las EC2 de ambas células y uso de las cabeceras `X-Trace-Id` y `X-Servicio-Origen`.
+
+### Vacíos del backlog en HU-01 (confirmar con el PO)
+
+1. Un campo enviado con `null`, o un Nombre vacío o solo con espacios, se trata como omitido
+   (mensaje "es obligatorio").
+2. Un Nombre que no es texto (p. ej. un número JSON) responde "contiene caracteres no permitidos".
+3. "Máximo N caracteres" en Densidad y Pureza cuenta dígitos y punto decimal del número sin
+   ceros a la derecha del decimal (7.850 → "7.85" → 4 caracteres).
+4. Si Inventario devuelve un Código de artículo que no tiene el formato MP-00000, se trata como
+   una falla de Inventario (503 con el mensaje de c6) y no se guarda el material.
+5. Si dos peticiones registran el mismo nombre a la vez, el índice único rechaza la segunda y
+   se responde 409 con el mensaje de c3 (Inventario ya habrá registrado el artículo; queda en
+   el log con su SKU).
+6. El ID usa mínimo 3 dígitos (mat-001 … mat-999, mat-1000).
 
 ### Decisiones tomadas en este código
 

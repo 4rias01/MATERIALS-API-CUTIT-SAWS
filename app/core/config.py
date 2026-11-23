@@ -50,9 +50,12 @@ class Configuracion(BaseSettings):
 
     # --- Integraciones HTTP (timeout de 5 s) ------------------------------------------
     http_timeout_s: float = Field(default=5.0, gt=0)
-    # POR ACORDAR con cada célula: URL base de su API. Aún sin uso: se configuran desde ya
-    # para el despliegue. Las rutas de cada operación se agregan con la HU que las use.
+    # POR ACORDAR con cada célula: URL base de su API. Las rutas de cada operación se
+    # agregan con la HU que las use.
     inventario_url: str | None = None
+    # Ruta definida en el backlog (HU-01 c4).
+    inventario_ruta_materias_primas: str = "/inventario/materias-primas"
+    # Aún sin uso: se configura desde ya para el despliegue.
     patent_sweep_url: str | None = None
     # Circuit Breaker de cada cliente: fallos seguidos para abrir y segundos que permanece abierto.
     cb_umbral_fallos: int = Field(default=5, ge=1)
