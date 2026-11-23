@@ -1,15 +1,18 @@
-"""Cliente HTTP base: timeout, circuit breaker, cabeceras y métricas."""
+"""Clientes HTTP: base (timeout, circuit breaker, cabeceras y métricas) y cliente de Inventario."""
 
 import asyncio
+import json
 from collections.abc import Callable
 
 import httpx
 import pytest
 
+from app.core.config import Configuracion
 from app.core.contexto import establecer_contexto, restablecer_contexto
 from app.core.exceptions import ErrorServicioExterno
-from app.infraestructure.clients import CircuitBreaker, ClienteHttpBase, EstadoCircuito
-from app.infraestructure.interfaces import IClienteExterno
+from app.infraestructure.clients import CircuitBreaker, ClienteHttpBase, EstadoCircuito, InventarioClient
+from app.infraestructure.interfaces import IClienteExterno, IInventarioClient, NombreDuplicadoEnInventarioError
+from tests.conftest import configuracion_de_prueba
 
 
 class Reloj:
@@ -198,4 +201,54 @@ async def test_circuito_abierto_rechaza_sin_llamar() -> None:
 async def test_sin_url_configurada() -> None:
     with pytest.raises(ErrorServicioExterno) as error:
         await _cliente(lambda _: httpx.Response(200), url_base=None).consultar()
+    assert error.value.causa == ErrorServicioExterno.SIN_CONFIGURAR
+
+
+# ── Cliente de Inventario (HU-01 c4 y c5) ──────────────────────────────────────
+
+
+def _inventario(manejador: Callable[[httpx.Request], object], config: Configuracion | None = None) -> InventarioClient:
+    return InventarioClient(
+        httpx.AsyncClient(transport=httpx.MockTransport(manejador)),  # type: ignore[arg-type]
+        config or configuracion_de_prueba(),
+        CircuitBreaker("inventario"),
+    )
+
+
+async def test_registrar_materia_prima_devuelve_el_codigo_de_articulo() -> None:
+    recibidas: list[httpx.Request] = []
+
+    def manejador(peticion: httpx.Request) -> httpx.Response:
+        recibidas.append(peticion)
+        return httpx.Response(201, json={"codigo": "MP-00007"})
+
+    cliente = _inventario(manejador)
+    assert isinstance(cliente, IInventarioClient)
+    assert await cliente.registrar_materia_prima("Acero 1045", "kg") == "MP-00007"
+    peticion = recibidas[0]
+    assert (peticion.method, str(peticion.url)) == ("POST", "http://inventario.prueba/inventario/materias-primas")
+    assert json.loads(peticion.content) == {"nombre": "Acero 1045", "unidadMedida": "kg"}
+
+
+async def test_nombre_duplicado_en_inventario() -> None:
+    cliente = _inventario(lambda _: httpx.Response(409, json={"mensaje": "Ya existe un artículo con el nombre Acero"}))
+    with pytest.raises(NombreDuplicadoEnInventarioError) as error:
+        await cliente.registrar_materia_prima("Acero", "kg")
+    assert error.value.mensaje_recibido == "Ya existe un artículo con el nombre Acero"
+
+
+@pytest.mark.parametrize(
+    "respuesta",
+    [httpx.Response(201, json={}), httpx.Response(201, json={"codigo": 7}), httpx.Response(400, json={"mensaje": "x"})],
+)
+async def test_respuestas_inesperadas_de_inventario(respuesta: httpx.Response) -> None:
+    with pytest.raises(ErrorServicioExterno) as error:
+        await _inventario(lambda _: respuesta).registrar_materia_prima("Acero", "kg")
+    assert error.value.causa == ErrorServicioExterno.RESPUESTA_INESPERADA
+
+
+async def test_inventario_sin_url_configurada() -> None:
+    cliente = _inventario(lambda _: httpx.Response(201), configuracion_de_prueba(inventario_url=None))
+    with pytest.raises(ErrorServicioExterno) as error:
+        await cliente.registrar_materia_prima("Acero", "kg")
     assert error.value.causa == ErrorServicioExterno.SIN_CONFIGURAR
