@@ -7,6 +7,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import ErrorIntegridadDatos
+from app.infraestructure.interfaces.material_repository import FiltrosMaterial
 from app.infraestructure.models import Auditoria, Material
 from app.infraestructure.repositories import AuditoriaRepository, MaterialRepository
 from app.infraestructure.unit_of_work import UnitOfWork
@@ -88,3 +89,14 @@ async def test_auditoria_de_solo_insercion(sesion: AsyncSession, otra_sesion: As
     registro = (await otra_sesion.scalars(select(Auditoria))).one()
     assert (registro.operacion, registro.resultado_http, registro.detalle) == ("REGISTRAR_MATERIAL", 201, {"clave": "valor"})
     assert await otra_sesion.scalar(select(func.count()).select_from(Auditoria)) == 1
+
+
+async def test_consulta_materiales_con_paginacion_y_busqueda_literal(sesion: AsyncSession) -> None:
+    await _guardar(sesion, un_material(1000, nombre="Acero fino"), un_material(999, nombre="ACERO A"))
+    repo = MaterialRepository(sesion)
+    filtros = FiltrosMaterial(nombre="cEr", categoria="Materia Prima", unidad_medida="kg", estado="ACTIVO")
+    pagina, total = await repo.listar(filtros, 1, 1)
+    assert total == 2 and [m.id_material for m in pagina] == ["mat-1000"]
+    assert await repo.obtener("mat-1000") is pagina[0]
+    assert await repo.listar(filtros, 2, 1) == ([], 2)
+    assert await repo.listar(FiltrosMaterial(nombre="%"), 0, 10) == ([], 0)

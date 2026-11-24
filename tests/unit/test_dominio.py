@@ -13,8 +13,9 @@ def _constantes() -> dict[str, str]:
 
 def test_el_catalogo_tiene_los_17_mensajes_de_hu01() -> None:
     constantes = _constantes()
-    assert len(constantes) == 17
-    assert {k[:4] for k in constantes} == {"HU01"}
+    assert sum(k.startswith("HU01") for k in constantes) == 17
+    assert sum(k.startswith("HU02") for k in constantes) == 4
+    assert {k[:4] for k in constantes} == {"HU01", "HU02"}
     assert all(isinstance(v, str) and v.strip() == v and v for v in constantes.values())
 
 

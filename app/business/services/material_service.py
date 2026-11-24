@@ -16,7 +16,7 @@ from app.business.domain.value_objects import Sku, id_material, normalizar_nombr
 from app.business.services.base import Resultado, ServicioBase, ahora, operacion_de_negocio
 from app.business.services.comandos import RegistrarMaterialComando
 from app.core.events import BusEventos
-from app.core.exceptions import ConflictoError, ErrorBaseDatos, ErrorIntegridadDatos, ErrorServicioExterno
+from app.core.exceptions import ConflictoError, ErrorBaseDatos, ErrorIntegridadDatos, ErrorServicioExterno, RecursoNoEncontradoError
 from app.infraestructure.interfaces import (
     IAuditoriaRepository,
     IInventarioClient,
@@ -24,10 +24,12 @@ from app.infraestructure.interfaces import (
     IUnitOfWork,
     NombreDuplicadoEnInventarioError,
 )
+from app.infraestructure.interfaces.material_repository import FiltrosMaterial
 from app.infraestructure.models import Material
 
 logger = logging.getLogger(__name__)
 
+TAMANO_PAGINA = 10
 RECURSO = "material"
 OPERACION_REGISTRAR = "REGISTRAR_MATERIAL"
 SERVICIO_INVENTARIO = "inventario"
@@ -47,6 +49,19 @@ class MaterialService(ServicioBase):
         super().__init__(uow, auditoria, eventos)
         self._materiales = materiales
         self._inventario = inventario
+
+    @operacion_de_negocio("CONSULTAR_MATERIAL", RECURSO, mensaje_error_bd=mensajes.HU02_C5, auditar=False)
+    async def consultar(self, identificador: str) -> Material:
+        async with self._uow:
+            material = await self._materiales.obtener(identificador)
+            if material is None:
+                raise RecursoNoEncontradoError(formatear(mensajes.HU02_C4, IDIngresado=identificador))
+            return material
+
+    @operacion_de_negocio("LISTAR_MATERIALES", RECURSO, mensaje_error_bd=mensajes.HU02_C5, auditar=False)
+    async def listar(self, filtros: FiltrosMaterial, pagina: int) -> tuple[list[Material], int]:
+        async with self._uow:
+            return await self._materiales.listar(filtros, (pagina - 1) * TAMANO_PAGINA, TAMANO_PAGINA)
 
     @operacion_de_negocio(
         OPERACION_REGISTRAR,

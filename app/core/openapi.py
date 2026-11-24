@@ -11,6 +11,7 @@ API REST del módulo **Materiales y Fórmulas** de la plataforma backend de Cuti
 
 * **Materiales** (HU-01): registrar un material nuevo, que también se registra como
   materia prima en Inventario.
+* **Consultas** (HU-02): obtener una ficha técnica por ID y filtrar el catálogo en páginas de 10 materiales.
 
 **Formato de las respuestas**
 
@@ -26,7 +27,7 @@ API REST del módulo **Materiales y Fórmulas** de la plataforma backend de Cuti
 """
 
 ETIQUETAS = [
-    {"name": "Materiales", "description": "Catálogo de materiales (HU-01)."},
+    {"name": "Materiales", "description": "Registro y consulta del catálogo de materiales (HU-01 y HU-02)."},
     {"name": "Monitoreo", "description": "Estado de la API (/health). Las métricas están en /metrics."},
 ]
 

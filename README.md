@@ -3,21 +3,22 @@
 API REST de la célula 1 de la plataforma backend de Cutit Saws (Desarrollo de Software II, 2026-2).
 Implementa el **DAS v1.2** del módulo y el **product backlog V1.3**.
 
-> **Estado (sprint 0):** la infraestructura transversal funciona y está probada, y hay **un
-> solo flujo implementado de punta a punta como ejemplo: HU-01, registrar material**
-> (`POST /materiales`). Las demás historias se agregan en los siguientes sprints siguiendo
-> ese mismo flujo (sección 4).
+La API permite registrar materiales con `POST /materiales` (HU-01), consultar su ficha con
+`GET /materiales/{id}` y listar el catálogo con `GET /materiales` (HU-02). En Swagger
+(`/docs`) se pueden probar las dos consultas. Por ejemplo,
+`GET /materiales?nombre=acero&unidadMedida=kg&estado=ACTIVO&pagina=1` devuelve hasta
+10 coincidencias. También se puede filtrar por `categoria`.
 
 | Funciona hoy | Pendiente |
 |---|---|
-| Arquitectura en capas, inyección de dependencias, configuración por variables de entorno | HU-02 a HU-11 (rutas, DTO, servicios, tablas y pruebas) |
+| Arquitectura en capas, inyección de dependencias, configuración por variables de entorno | HU-03 a HU-11 (rutas, DTO, servicios, tablas y pruebas) |
 | HU-01 completa: DTO con los mensajes del criterio 2, servicio, repositorio y alta en Inventario | Contrato POR ACORDAR con Inventario (sección 11) |
 | Modelo ORM de `material` y `auditoria`, migración Alembic | |
 | Unidad de trabajo (commit/rollback, timeout de 5 s), auditoría, eventos de dominio | |
 | Cliente de Inventario (timeout de 5 s, circuit breaker, traceId) | |
 | traceId, logs JSON, manejador global de errores, `/health`, `/metrics`, Swagger | |
 | Dockerfile, Docker Compose, Prometheus, Grafana, node-exporter, GitHub Actions, SonarCloud | |
-| Pruebas unitarias, de integración y de aceptación de HU-01 (`tests/hu`) | |
+| Pruebas unitarias, de integración y de aceptación de HU-01 y HU-02 (`tests/hu`) | |
 
 ---
 
@@ -54,7 +55,7 @@ migrations/                     Migraciones versionadas (Alembic)
 tests/
 ├── unit/                       Sin base de datos ni APIs externas
 ├── integration/                Contra PostgreSQL (TEST_DATABASE_URL)
-├── hu/                         Una o más pruebas por criterio de aceptación (hoy, HU-01)
+├── hu/                         Una o más pruebas por criterio de aceptación (HU-01 y HU-02)
 ├── dobles/                     Repositorios y cliente en memoria (Test Double)
 └── fabricas.py                 Objetos de prueba con valores válidos
 monitoring/                     prometheus.yml y aprovisionamiento + tablero de Grafana

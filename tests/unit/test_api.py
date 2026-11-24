@@ -140,6 +140,8 @@ async def test_metrics_expone_las_metricas_para_prometheus(cliente: httpx.AsyncC
 # ---------------------------------------------------------------------------------------
 
 RUTAS = {
+    ("get", "/materiales/{id}"): "200",
+    ("get", "/materiales"): "200",
     ("post", "/materiales"): "201",
     ("get", "/health"): "200",
 }

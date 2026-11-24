@@ -5,6 +5,7 @@ from types import TracebackType
 
 from app.core.exceptions import ErrorBaseDatos
 from app.infraestructure.interfaces import IAuditoriaRepository, IMaterialRepository, IUnitOfWork
+from app.infraestructure.interfaces.material_repository import FiltrosMaterial
 from app.infraestructure.models import Auditoria, Material
 
 
@@ -80,3 +81,17 @@ class MaterialRepositoryFalso(IMaterialRepository):
 
     def agregar(self, material: Material) -> None:
         self.materiales[material.id_material] = material
+
+    async def obtener(self, identificador: str) -> Material | None:
+        return self.materiales.get(identificador)
+
+    async def listar(self, filtros: FiltrosMaterial, offset: int, limite: int) -> tuple[list[Material], int]:
+        encontrados = [
+            m for m in self.materiales.values()
+            if (filtros.nombre is None or filtros.nombre.lower() in m.nombre.lower())
+            and (filtros.categoria is None or filtros.categoria == m.categoria)
+            and (filtros.unidad_medida is None or filtros.unidad_medida == m.unidad_medida)
+            and (filtros.estado is None or filtros.estado == m.estado)
+        ]
+        encontrados.sort(key=lambda m: (len(m.id_material), m.id_material))
+        return encontrados[offset:offset + limite], len(encontrados)
