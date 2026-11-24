@@ -1,4 +1,4 @@
-"""Tabla material."""
+"""Tabla material (HU-01)."""
 
 from datetime import datetime
 from decimal import Decimal
@@ -13,19 +13,24 @@ CATEGORIAS = ("Materia Prima", "Componentes", "Lubricantes")
 UNIDADES_MEDIDA = ("und", "g", "kg", "mL", "L", "m")
 ESTADOS_MATERIAL = ("ACTIVO", "INACTIVO")
 
+# Nombre único sin distinguir mayúsculas de minúsculas (HU-01 c3).
+RESTRICCION_NOMBRE_UNICO = "uq_material_nombre_lower"
+
 
 class Material(Base):
     """Material del catálogo (HU-01)."""
 
     __tablename__ = "material"
 
+    # mat-NNN; el número sale de la secuencia seq_material (app/infraestructure/models/base.py).
     id_material: Mapped[str] = mapped_column(String(10), primary_key=True)
+    # Código de artículo que asigna Inventario (MP-00000).
     sku: Mapped[str] = mapped_column(String(8), unique=True)
     nombre: Mapped[str] = mapped_column(String(100))
     categoria: Mapped[str] = mapped_column(String(15))
     unidad_medida: Mapped[str] = mapped_column(String(3))
-    densidad: Mapped[Decimal] = mapped_column(Numeric)
-    pureza: Mapped[Decimal] = mapped_column(Numeric)
+    densidad: Mapped[Decimal] = mapped_column(Numeric(8, 4))
+    pureza: Mapped[Decimal] = mapped_column(Numeric(5, 2))
     estado: Mapped[str] = mapped_column(String(8))
     fecha_registro: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     fecha_actualizacion: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -42,5 +47,4 @@ class Material(Base):
         return f"<Material {self.id_material} {self.nombre!r} {self.estado}>"
 
 
-# Nombre único sin distinguir mayúsculas de minúsculas (HU-01 c3).
-Index("uq_material_nombre_lower", func.lower(Material.nombre), unique=True)
+Index(RESTRICCION_NOMBRE_UNICO, func.lower(Material.nombre), unique=True)

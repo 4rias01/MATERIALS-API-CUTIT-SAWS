@@ -1,4 +1,10 @@
-"""Repositorio de materiales con SQLAlchemy."""
+"""Repositorio de materiales con SQLAlchemy.
+
+Todas las consultas usan parámetros enlazados (nunca texto concatenado), así que los
+valores del cliente no pueden alterar el SQL (OWASP A03: inyección).
+"""
+
+from collections.abc import Sequence
 
 from sqlalchemy import BigInteger, exists, func, literal, select, true
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,24 +14,16 @@ from app.infraestructure.interfaces.material_repository import FiltrosMaterial, 
 from app.infraestructure.models import SECUENCIA_MATERIAL, Material
 
 
+def _escapar_like(texto: str) -> str:
+    """Escapa los comodines de LIKE para que el fragmento se busque literalmente."""
+    return texto.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
 class MaterialRepository(IMaterialRepository):
     def __init__(self, sesion: AsyncSession) -> None:
         self._sesion = sesion
 
-    async def existe_nombre(self, nombre: str) -> bool:
-        condicion = func.lower(Material.nombre) == nombre.lower()
-        return bool(await self._sesion.scalar(select(exists().where(condicion))))
-
-    async def siguiente_numero(self) -> int:
-        return int((await self._sesion.execute(select(SECUENCIA_MATERIAL.next_value()))).scalar_one())
-
-    def agregar(self, material: Material) -> None:
-        self._sesion.add(material)
-
-    async def obtener(self, identificador: str) -> Material | None:
-        return await self._sesion.get(Material, identificador)
-
-    async def listar(self, filtros: FiltrosMaterial, offset: int, limite: int) -> tuple[list[Material], int]:
+    async def listar_pagina(self, filtros: FiltrosMaterial, offset: int, limite: int) -> tuple[list[Material], int]:
         condiciones = []
         if filtros.nombre is not None:
             condiciones.append(Material.nombre.icontains(filtros.nombre, autoescape=True))
@@ -51,3 +49,34 @@ class MaterialRepository(IMaterialRepository):
         )
         filas = (await self._sesion.execute(consulta)).all()
         return [material for _, material in filas if material is not None], filas[0][0]
+
+    async def obtener_por_id(self, id_material: str) -> Material | None:
+        return await self._sesion.get(Material, id_material)
+
+    async def listar(self) -> Sequence[Material]:
+        consulta = select(Material).order_by(Material.fecha_registro, Material.id_material)
+        return (await self._sesion.scalars(consulta)).all()
+
+    async def buscar_por_nombre(self, fragmento: str) -> Sequence[Material]:
+        consulta = (
+            select(Material)
+            .where(Material.nombre.ilike(f"%{_escapar_like(fragmento)}%", escape="\\"))
+            .order_by(Material.fecha_registro, Material.id_material)
+        )
+        return (await self._sesion.scalars(consulta)).all()
+
+    async def existe_nombre(self, nombre: str, excluir_id: str | None = None) -> bool:
+        condicion = func.lower(Material.nombre) == nombre.lower()
+        if excluir_id is not None:
+            condicion = condicion & (Material.id_material != excluir_id)
+        return bool(await self._sesion.scalar(select(exists().where(condicion))))
+
+    async def siguiente_numero(self) -> int:
+        return int((await self._sesion.execute(select(SECUENCIA_MATERIAL.next_value()))).scalar_one())
+
+    async def agregar(self, material: Material) -> None:
+        self._sesion.add(material)
+        await self._sesion.flush()  # INSERT dentro de la transacción: las restricciones se verifican ya
+
+    async def eliminar(self, material: Material) -> None:
+        await self._sesion.delete(material)

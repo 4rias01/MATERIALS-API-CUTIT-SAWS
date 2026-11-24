@@ -54,8 +54,8 @@ def traducir_error_base_datos(exc: BaseException) -> ErrorBaseDatos:
     """Convierte una excepción del driver o del ORM en ``ErrorBaseDatos``.
 
     Para las violaciones de restricciones devuelve ``ErrorIntegridadDatos`` con el
-    nombre de la restricción (por ejemplo ``uq_material_nombre_lower``), útil para
-    responder 409 si dos peticiones registran el mismo nombre a la vez.
+    nombre de la restricción (por ejemplo, un índice único), útil para responder 409
+    si dos peticiones registran el mismo valor a la vez.
     """
     if isinstance(exc, IntegrityError):
         causa = getattr(exc.orig, "__cause__", None)

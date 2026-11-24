@@ -1,4 +1,9 @@
-"""Repositorios y unidad de trabajo en memoria."""
+"""Repositorios y unidad de trabajo en memoria.
+
+En las pruebas unitarias del servicio el repositorio de materiales también se puede
+simular con ``AsyncMock(spec=IMaterialRepository)`` (el equivalente al ``@Mock`` de
+Mockito); ``MaterialRepositoryFalso`` sirve cuando la prueba recorre la API completa.
+"""
 
 from collections.abc import Sequence
 from types import TracebackType
@@ -14,7 +19,8 @@ class UnitOfWorkFalsa(IUnitOfWork):
 
     Un bloque ``async with`` que termina sin ``commit`` (con o sin excepción) cuenta como
     reversión. ``error_en_commit`` es la excepción que lanza el commit (por ejemplo, un
-    ``ErrorIntegridadDatos``); ``fallar_en_commit`` lanza un ``ErrorBaseDatos`` genérico.
+    ``ErrorIntegridadDatos``); ``fallar_en_commit`` lanza un ``ErrorBaseDatos`` genérico y
+    ``base_disponible=False`` simula una base que no responde (para /health).
     """
 
     def __init__(
@@ -34,9 +40,7 @@ class UnitOfWorkFalsa(IUnitOfWork):
         self._confirmado = False
         return self
 
-    async def __aexit__(
-        self, tipo: type[BaseException] | None, exc: BaseException | None, traza: TracebackType | None
-    ) -> None:
+    async def __aexit__(self, tipo: type[BaseException] | None, exc: BaseException | None, traza: TracebackType | None) -> None:
         if exc is not None or not self._confirmado:
             self.reversiones += 1
 
@@ -57,6 +61,8 @@ class UnitOfWorkFalsa(IUnitOfWork):
 
 
 class AuditoriaRepositoryFalso(IAuditoriaRepository):
+    """Guarda en una lista los registros de auditoría que agrega el servicio."""
+
     def __init__(self) -> None:
         self.registros: list[Auditoria] = []
 
@@ -69,23 +75,17 @@ class MaterialRepositoryFalso(IMaterialRepository):
     aunque la unidad de trabajo falle; para eso, verificar ``uow.confirmaciones``."""
 
     def __init__(self, materiales: Sequence[Material] = ()) -> None:
-        self.materiales: dict[str, Material] = {m.id_material: m for m in materiales}
+        self.materiales: dict[str, Material] = {}
+        self._secuencia = 0
+        self.sembrar(*materiales)
+
+    def sembrar(self, *materiales: Material) -> None:
+        """Deja materiales ya registrados (preparación de la prueba, sin pasar por el servicio)."""
+        for material in materiales:
+            self.materiales[material.id_material] = material
         self._secuencia = len(self.materiales)
 
-    async def existe_nombre(self, nombre: str) -> bool:
-        return any(m.nombre.lower() == nombre.lower() for m in self.materiales.values())
-
-    async def siguiente_numero(self) -> int:
-        self._secuencia += 1
-        return self._secuencia
-
-    def agregar(self, material: Material) -> None:
-        self.materiales[material.id_material] = material
-
-    async def obtener(self, identificador: str) -> Material | None:
-        return self.materiales.get(identificador)
-
-    async def listar(self, filtros: FiltrosMaterial, offset: int, limite: int) -> tuple[list[Material], int]:
+    async def listar_pagina(self, filtros: FiltrosMaterial, offset: int, limite: int) -> tuple[list[Material], int]:
         encontrados = [
             m for m in self.materiales.values()
             if (filtros.nombre is None or filtros.nombre.lower() in m.nombre.lower())
@@ -95,3 +95,25 @@ class MaterialRepositoryFalso(IMaterialRepository):
         ]
         encontrados.sort(key=lambda m: (len(m.id_material), m.id_material))
         return encontrados[offset:offset + limite], len(encontrados)
+
+    async def obtener_por_id(self, id_material: str) -> Material | None:
+        return self.materiales.get(id_material)
+
+    async def listar(self) -> Sequence[Material]:
+        return list(self.materiales.values())
+
+    async def buscar_por_nombre(self, fragmento: str) -> Sequence[Material]:
+        return [m for m in self.materiales.values() if fragmento.lower() in m.nombre.lower()]
+
+    async def existe_nombre(self, nombre: str, excluir_id: str | None = None) -> bool:
+        return any(m.nombre.lower() == nombre.lower() and m.id_material != excluir_id for m in self.materiales.values())
+
+    async def siguiente_numero(self) -> int:
+        self._secuencia += 1
+        return self._secuencia
+
+    async def agregar(self, material: Material) -> None:
+        self.materiales[material.id_material] = material
+
+    async def eliminar(self, material: Material) -> None:
+        self.materiales.pop(material.id_material, None)

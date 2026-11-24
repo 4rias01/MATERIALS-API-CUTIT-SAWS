@@ -1,11 +1,24 @@
-"""Cliente de Inventario simulado."""
+"""Clientes de otras células simulados."""
 
 from app.core.exceptions import ErrorServicioExterno
-from app.infraestructure.interfaces import IInventarioClient, NombreDuplicadoEnInventarioError
+from app.infraestructure.interfaces import IClienteExterno, IInventarioClient, NombreDuplicadoEnInventarioError
+
+
+class ClienteExternoFalso(IClienteExterno):
+    """Cliente mínimo que solo informa el estado de su circuito (para /health)."""
+
+    def __init__(self, estado: str = "CERRADO") -> None:
+        self.estado = estado
+
+    def estado_circuito(self) -> str:
+        return self.estado
 
 
 class InventarioClientFalso(IInventarioClient):
-    """Responde con ``sku`` o con el fallo configurado (``nombre_duplicado`` o ``caido``)."""
+    """Responde con ``sku`` o con el fallo configurado (``nombre_duplicado`` o ``caido``).
+
+    ``altas`` guarda las materias primas registradas como (nombre, unidad de medida).
+    """
 
     def __init__(self, sku: str = "MP-00001", nombre_duplicado: bool = False, caido: bool = False) -> None:
         self.sku = sku

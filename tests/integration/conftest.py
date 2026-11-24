@@ -2,7 +2,7 @@
 
 Usa ``TEST_DATABASE_URL`` (sin valor por defecto).
 Al iniciar la sesión aplica las migraciones desde cero; antes de cada prueba vacía las
-tablas y reinicia las secuencias. Si la base no responde, las pruebas se omiten.
+tablas (y reinicia las secuencias, si las hay). Si la base no responde, las pruebas se omiten.
 """
 
 import asyncio
@@ -19,8 +19,9 @@ from app.infraestructure.database import crear_fabrica_sesiones
 from tests.conftest import URL_BD_PRUEBAS
 
 RAIZ = Path(__file__).resolve().parents[2]
-TABLAS = "auditoria, material"
-SECUENCIAS = ("seq_material",)
+# Al agregar una tabla o secuencia con una migración, agregarla también aquí.
+TABLAS = "auditoria, formula_componente, formula, material"
+SECUENCIAS: tuple[str, ...] = ("seq_material", "seq_formula")
 
 
 def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:

@@ -1,39 +1,47 @@
-"""Rutas del recurso /materiales (HU-01 y HU-02)."""
+"""Rutas del recurso /materiales.
+
+* POST: HU-01 (registrar material).
+* GET: ficha técnica y listado paginado (HU-02).
+* El CRUD conserva la búsqueda por nombre, la actualización y la eliminación.
+"""
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Path, Query
+from fastapi import APIRouter, Depends, Path, Query, Response
 
 from app.api.dependencies import obtener_material_service
-from app.api.schemas.comun import respuestas_error
-from app.api.schemas.materiales import ConsultaMaterial, FichaMaterial, ListaMateriales, MaterialCrearSolicitud, MaterialRespuesta
+from app.api.schemas.comun import mensaje_solicitud_invalida, respuestas_error
+from app.api.schemas.materiales import (
+    ConsultaMaterial,
+    FichaMaterial,
+    ListaMateriales,
+    MaterialActualizarSolicitud,
+    MaterialCrearSolicitud,
+    MaterialRegistradoRespuesta,
+    MaterialRespuesta,
+)
 from app.business.domain import mensajes
 from app.business.services.material_service import TAMANO_PAGINA, MaterialService
 
 router = APIRouter(prefix="/materiales", tags=["Materiales"])
 
 Servicio = Annotated[MaterialService, Depends(obtener_material_service)]
+# ID secuencial mat-NNN (HU-01 c7.1); el patrón evita consultar la base con valores arbitrarios.
+IdMaterial = Annotated[str, Path(pattern=r"^mat-\d{3,6}$", description="Id del material (mat-NNN).", examples=["mat-001"])]
+ID_INVALIDO = mensaje_solicitud_invalida(mensajes.formatear(mensajes.MATERIAL_CAMPO_INVALIDO, campo="id"))
 
 
 @router.post(
     "",
     status_code=201,
-    response_model=MaterialRespuesta,
+    response_model=MaterialRegistradoRespuesta,
     summary="Registrar un material (HU-01)",
     description="Registra el material como materia prima en Inventario, que asigna el SKU, y lo guarda en estado ACTIVO.",
     responses=respuestas_error(400, 409, 500, 503),
 )
-async def registrar_material(solicitud: MaterialCrearSolicitud, servicio: Servicio) -> MaterialRespuesta:
+async def registrar_material(solicitud: MaterialCrearSolicitud, servicio: Servicio) -> MaterialRegistradoRespuesta:
     resultado = await servicio.registrar(solicitud.a_comando())
-    return MaterialRespuesta.desde_modelo(resultado.datos, resultado.mensaje or "")
-
-
-@router.get("/{id}", summary="Consultar la ficha técnica de un material (HU-02)", responses=respuestas_error(404, 500))
-async def consultar_material(
-    id: Annotated[str, Path(description="ID del material, formato mat-NNN.", examples=["mat-101"])],
-    servicio: Servicio,
-) -> FichaMaterial:
-    return FichaMaterial.de_material(await servicio.consultar(id))
+    return MaterialRegistradoRespuesta.con_mensaje(resultado.datos, resultado.mensaje or "")
 
 
 @router.get("", summary="Listar materiales (HU-02)", responses=respuestas_error(400, 500), response_model_exclude_none=True)
@@ -47,3 +55,52 @@ async def listar_materiales(consulta: Annotated[ConsultaMaterial, Query()], serv
         materiales=[FichaMaterial.de_material(material) for material in materiales],
         mensaje=mensajes.HU02_C7 if total == 0 else None,
     )
+
+
+# Antes de /{id_material}: si no, "buscar" se tomaría como un id.
+@router.get(
+    "/buscar",
+    response_model=list[MaterialRespuesta],
+    summary="Buscar por nombre",
+    description="Materiales cuyo nombre contiene el texto, sin distinguir mayúsculas.",
+    responses=respuestas_error(400, 500),
+    openapi_extra=mensaje_solicitud_invalida(mensajes.formatear(mensajes.MATERIAL_CAMPO_INVALIDO, campo="nombre")),
+)
+async def buscar_por_nombre(
+    servicio: Servicio, nombre: Annotated[str, Query(min_length=1, max_length=100)]
+) -> list[MaterialRespuesta]:
+    resultado = await servicio.buscar_por_nombre(nombre)
+    return [MaterialRespuesta.desde_modelo(m) for m in resultado.datos]
+
+
+@router.get("/{id_material}", summary="Consultar la ficha técnica de un material (HU-02)", responses=respuestas_error(404, 500))
+async def obtener_por_id(
+    id_material: Annotated[str, Path(description="ID del material, formato mat-NNN.", examples=["mat-101"])],
+    servicio: Servicio,
+) -> FichaMaterial:
+    resultado = await servicio.obtener_por_id(id_material)
+    return FichaMaterial.de_material(resultado.datos)
+
+
+@router.put(
+    "/{id_material}",
+    response_model=MaterialRespuesta,
+    summary="Actualizar material",
+    responses=respuestas_error(400, 404, 409, 500),
+    openapi_extra=ID_INVALIDO,
+)
+async def actualizar(id_material: IdMaterial, solicitud: MaterialActualizarSolicitud, servicio: Servicio) -> MaterialRespuesta:
+    resultado = await servicio.actualizar(id_material, solicitud.a_datos())
+    return MaterialRespuesta.desde_modelo(resultado.datos)
+
+
+@router.delete(
+    "/{id_material}",
+    status_code=204,
+    summary="Eliminar material",
+    responses=respuestas_error(400, 404, 500),
+    openapi_extra=ID_INVALIDO,
+)
+async def eliminar(id_material: IdMaterial, servicio: Servicio) -> Response:
+    await servicio.eliminar(id_material)
+    return Response(status_code=204)

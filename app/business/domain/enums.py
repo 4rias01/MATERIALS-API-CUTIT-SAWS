@@ -1,8 +1,7 @@
 """Valores permitidos del dominio (objetos de valor enumerados).
 
 Las restricciones CHECK de la base de datos repiten estos valores
-(app/infraestructure/models). La prueba tests/unit/test_modelos_vs_dominio.py verifica
-que ambas listas coincidan.
+(app/infraestructure/models/material.py).
 """
 
 from enum import StrEnum
@@ -32,3 +31,13 @@ class EstadoMaterial(StrEnum):
 
     ACTIVO = "ACTIVO"
     INACTIVO = "INACTIVO"
+
+
+class EstadoFormula(StrEnum):
+    """Estados definidos en HU-05 c7.2; el registro solo crea BORRADOR."""
+
+    BORRADOR = "BORRADOR"
+    EVALUANDO_PATENTE = "EVALUANDO_PATENTE"
+    APROBADA = "APROBADA"
+    RECHAZADA_POR_INFRACCION = "RECHAZADA_POR_INFRACCION"
+    DESCONTINUADA = "DESCONTINUADA"

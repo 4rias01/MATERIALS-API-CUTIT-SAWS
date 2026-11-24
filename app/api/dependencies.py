@@ -7,20 +7,32 @@ clientes HTTP, siempre detrás de sus interfaces. En las pruebas se reemplazan c
 
 FastAPI reutiliza cada dependencia dentro de una misma petición, así que la unidad de
 trabajo y los repositorios comparten la misma sesión de base de datos.
+
+Para un servicio nuevo: agregar el proveedor de su repositorio (``obtener_repositorio_x``),
+el de su cliente externo si lo usa, y ``obtener_x_service`` que los combine.
 """
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Mapping
 from typing import Annotated
 
 from fastapi import Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.business.services.formula_service import FormulaService
 from app.business.services.material_service import MaterialService
 from app.business.services.salud_service import SaludService
 from app.core.config import Configuracion
 from app.core.events import BusEventos
-from app.infraestructure.interfaces import IAuditoriaRepository, IInventarioClient, IMaterialRepository, IUnitOfWork
-from app.infraestructure.repositories import AuditoriaRepository, MaterialRepository
+from app.infraestructure.clients.inventario_client import SERVICIO as SERVICIO_INVENTARIO
+from app.infraestructure.interfaces import (
+    IAuditoriaRepository,
+    IClienteExterno,
+    IFormulaRepository,
+    IInventarioClient,
+    IMaterialRepository,
+    IUnitOfWork,
+)
+from app.infraestructure.repositories import AuditoriaRepository, FormulaRepository, MaterialRepository
 from app.infraestructure.unit_of_work import UnitOfWork
 
 # --- Recursos compartidos creados en el arranque (app/main.py) ---------------------------
@@ -34,8 +46,13 @@ def obtener_bus_eventos(request: Request) -> BusEventos:
     return request.app.state.bus_eventos
 
 
+def obtener_clientes_externos(request: Request) -> Mapping[str, IClienteExterno]:
+    """Clientes de las APIs de otras células, por nombre de servicio."""
+    return request.app.state.clientes_externos
+
+
 def obtener_cliente_inventario(request: Request) -> IInventarioClient:
-    return request.app.state.cliente_inventario
+    return request.app.state.clientes_externos[SERVICIO_INVENTARIO]
 
 
 # --- Por petición -----------------------------------------------------------------------
@@ -54,18 +71,24 @@ def obtener_unidad_de_trabajo(sesion: Sesion) -> IUnitOfWork:
     return UnitOfWork(sesion)
 
 
-def obtener_repositorio_materiales(sesion: Sesion) -> IMaterialRepository:
-    return MaterialRepository(sesion)
-
-
 def obtener_repositorio_auditoria(sesion: Sesion) -> IAuditoriaRepository:
     return AuditoriaRepository(sesion)
 
 
+def obtener_repositorio_materiales(sesion: Sesion) -> IMaterialRepository:
+    return MaterialRepository(sesion)
+
+
+def obtener_repositorio_formulas(sesion: Sesion) -> IFormulaRepository:
+    return FormulaRepository(sesion)
+
+
 UnidadDeTrabajo = Annotated[IUnitOfWork, Depends(obtener_unidad_de_trabajo)]
-RepositorioMateriales = Annotated[IMaterialRepository, Depends(obtener_repositorio_materiales)]
 RepositorioAuditoria = Annotated[IAuditoriaRepository, Depends(obtener_repositorio_auditoria)]
+RepositorioMateriales = Annotated[IMaterialRepository, Depends(obtener_repositorio_materiales)]
+RepositorioFormulas = Annotated[IFormulaRepository, Depends(obtener_repositorio_formulas)]
 Eventos = Annotated[BusEventos, Depends(obtener_bus_eventos)]
+ClientesExternos = Annotated[Mapping[str, IClienteExterno], Depends(obtener_clientes_externos)]
 ClienteInventario = Annotated[IInventarioClient, Depends(obtener_cliente_inventario)]
 
 
@@ -82,5 +105,15 @@ def obtener_material_service(
     return MaterialService(uow, auditoria, eventos, materiales, inventario)
 
 
-def obtener_salud_service(uow: UnidadDeTrabajo, inventario: ClienteInventario) -> SaludService:
-    return SaludService(uow, inventario)
+def obtener_salud_service(uow: UnidadDeTrabajo, clientes: ClientesExternos) -> SaludService:
+    return SaludService(uow, clientes)
+
+
+def obtener_formula_service(
+    uow: UnidadDeTrabajo,
+    auditoria: RepositorioAuditoria,
+    eventos: Eventos,
+    formulas: RepositorioFormulas,
+    materiales: RepositorioMateriales,
+) -> FormulaService:
+    return FormulaService(uow, auditoria, eventos, formulas, materiales)

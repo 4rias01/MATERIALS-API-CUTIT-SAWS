@@ -9,9 +9,9 @@ if TYPE_CHECKING:
 DESCRIPCION = """
 API REST del módulo **Materiales y Fórmulas** de la plataforma backend de Cutit Saws Ltd.
 
-* **Materiales** (HU-01): registrar un material nuevo, que también se registra como
-  materia prima en Inventario.
-* **Consultas** (HU-02): obtener una ficha técnica por ID y filtrar el catálogo en páginas de 10 materiales.
+* **Materiales**: registrar un material nuevo (HU-01), que también se registra como
+  materia prima en Inventario. Consultar fichas y filtrar el listado paginado (HU-02).
+  El CRUD conserva la búsqueda por nombre, la actualización y la eliminación.
 
 **Formato de las respuestas**
 
@@ -27,7 +27,8 @@ API REST del módulo **Materiales y Fórmulas** de la plataforma backend de Cuti
 """
 
 ETIQUETAS = [
-    {"name": "Materiales", "description": "Registro y consulta del catálogo de materiales (HU-01 y HU-02)."},
+    {"name": "Fórmulas", "description": "Registro de fórmulas en BORRADOR (HU-05)."},
+    {"name": "Materiales", "description": "Catálogo de materiales (HU-01, HU-02 y CRUD básico)."},
     {"name": "Monitoreo", "description": "Estado de la API (/health). Las métricas están en /metrics."},
 ]
 

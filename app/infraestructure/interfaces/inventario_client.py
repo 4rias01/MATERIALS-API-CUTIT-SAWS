@@ -1,6 +1,8 @@
 """Contrato del cliente de la API de Inventario (célula 4)."""
 
-from abc import ABC, abstractmethod
+from abc import abstractmethod
+
+from app.infraestructure.interfaces.cliente_externo import IClienteExterno
 
 
 class NombreDuplicadoEnInventarioError(Exception):
@@ -11,7 +13,7 @@ class NombreDuplicadoEnInventarioError(Exception):
         self.mensaje_recibido = mensaje_recibido
 
 
-class IInventarioClient(ABC):
+class IInventarioClient(IClienteExterno):
     """Operaciones que este módulo pide a Inventario (request-reply síncrono, timeout 5 s).
 
     Los fallos de comunicación (sin respuesta, error interno, más de 5 s o circuito
@@ -22,7 +24,3 @@ class IInventarioClient(ABC):
     async def registrar_materia_prima(self, nombre: str, unidad_medida: str) -> str:
         """Registra el material como materia prima y devuelve el Código de artículo
         (SKU, formato MP-00000) que asigna Inventario (HU-01 c4)."""
-
-    @abstractmethod
-    def estado_circuito(self) -> str:
-        """Estado del circuit breaker: CERRADO, ABIERTO o SEMIABIERTO."""

@@ -3,22 +3,23 @@
 API REST de la célula 1 de la plataforma backend de Cutit Saws (Desarrollo de Software II, 2026-2).
 Implementa el **DAS v1.2** del módulo y el **product backlog V1.3**.
 
-La API permite registrar materiales con `POST /materiales` (HU-01), consultar su ficha con
-`GET /materiales/{id}` y listar el catálogo con `GET /materiales` (HU-02). En Swagger
-(`/docs`) se pueden probar las dos consultas. Por ejemplo,
-`GET /materiales?nombre=acero&unidadMedida=kg&estado=ACTIVO&pagina=1` devuelve hasta
-10 coincidencias. También se puede filtrar por `categoria`.
+El catálogo permite registrar materiales en Inventario (HU-01), consultar su ficha técnica
+y filtrar el listado en páginas de 10 materiales (HU-02). La HU-05 registra fórmulas en
+estado BORRADOR. El CRUD básico conserva la búsqueda por nombre, la actualización y la eliminación.
 
 | Funciona hoy | Pendiente |
 |---|---|
-| Arquitectura en capas, inyección de dependencias, configuración por variables de entorno | HU-03 a HU-11 (rutas, DTO, servicios, tablas y pruebas) |
-| HU-01 completa: DTO con los mensajes del criterio 2, servicio, repositorio y alta en Inventario | Contrato POR ACORDAR con Inventario (sección 11) |
-| Modelo ORM de `material` y `auditoria`, migración Alembic | |
+| Arquitectura en capas, inyección de dependencias, configuración por variables de entorno | HU-03 a HU-04 y HU-06 a HU-11 (rutas, DTO, servicios, tablas, clientes y pruebas) |
+| HU-05: `POST /formulas`, validación de componentes activos, registro en BORRADOR y ficha técnica | |
+| HU-01 completa: DTO con los mensajes del criterio 2, servicio, repositorio y alta en Inventario | Contrato POR ACORDAR con Inventario y Patent Sweep (sección 11) |
+| CRUD básico de materiales: buscar por nombre, actualizar y eliminar | |
+| Modelos ORM y migraciones Alembic de `auditoria` y `material` | |
 | Unidad de trabajo (commit/rollback, timeout de 5 s), auditoría, eventos de dominio | |
-| Cliente de Inventario (timeout de 5 s, circuit breaker, traceId) | |
+| Cliente HTTP base (timeout de 5 s, circuit breaker, traceId) y cliente de Inventario | |
 | traceId, logs JSON, manejador global de errores, `/health`, `/metrics`, Swagger | |
 | Dockerfile, Docker Compose, Prometheus, Grafana, node-exporter, GitHub Actions, SonarCloud | |
-| Pruebas unitarias, de integración y de aceptación de HU-01 y HU-02 (`tests/hu`) | |
+| Pruebas unitarias, de integración y de aceptación de HU-01 (`tests/hu`) | |
+| Análisis de seguridad en el CI: reglas de Bandit en ruff, Semgrep (OWASP Top 10) y pip-audit | |
 
 ---
 
@@ -36,35 +37,38 @@ app/
 │   ├── metrics.py              Métricas de Prometheus y /metrics
 │   └── openapi.py              Documentación del contrato (/docs)
 ├── api/                        Capa de presentación (API REST)
-│   ├── routers/                materiales.py · health.py
+│   ├── routers/                health.py · materiales.py
 │   ├── schemas/                DTO de Pydantic (contratos de entrada y salida, camelCase)
 │   ├── middleware.py           traceId por petición (Correlation ID)
 │   ├── exception_handlers.py   Manejador global de excepciones
 │   └── dependencies.py         Inyección de dependencias (raíz de composición)
 ├── business/                   Capa de lógica de negocio
-│   ├── services/               MaterialService (casos de uso) · base.py (transacción, auditoría, errores)
-│   └── domain/                 enums · value_objects · errores · eventos · mensajes
+│   ├── services/               base.py (transacción, auditoría, errores) · comandos.py · material_service.py · salud_service.py
+│   └── domain/                 enums · errores · eventos · mensajes · value_objects
 └── infraestructure/            Capa de acceso a datos
-    ├── interfaces/             Contratos que usan los servicios (repositorios, cliente, unidad de trabajo)
+    ├── interfaces/             Contratos que usan los servicios (repositorios, clientes, unidad de trabajo)
     ├── repositories/           Implementaciones con SQLAlchemy
-    ├── models/                 Modelos ORM (material y auditoria)
-    ├── clients/                Cliente HTTP de Inventario + circuit breaker
+    ├── models/                 Modelos ORM (auditoria y material)
+    ├── clients/                Cliente HTTP base + circuit breaker + cliente de Inventario
     ├── unit_of_work.py         Transacción: commit / rollback
     └── database.py             Motor, pool de conexiones y timeouts
 migrations/                     Migraciones versionadas (Alembic)
 tests/
-├── unit/                       Sin base de datos ni APIs externas
-├── integration/                Contra PostgreSQL (TEST_DATABASE_URL)
-├── hu/                         Una o más pruebas por criterio de aceptación (HU-01 y HU-02)
-├── dobles/                     Repositorios y cliente en memoria (Test Double)
-└── fabricas.py                 Objetos de prueba con valores válidos
+├── conftest.py                 Fixtures comunes: app, cliente HTTP en memoria, configuración de prueba
+├── unit/                       Sin base de datos: MaterialService (repositorio simulado con AsyncMock), rutas,
+│                               objetos de valor, API, manejador de errores, clientes HTTP, servicio base, logging
+├── integration/                Contra PostgreSQL (TEST_DATABASE_URL): API de materiales, repositorio y
+│                               restricciones, unidad de trabajo, /health y migraciones
+├── hu/                         Una o más pruebas por criterio de aceptación (hoy, HU-01)
+├── fabricas.py                 Objetos del modelo con valores válidos para las pruebas
+└── dobles/                     Unidad de trabajo, repositorios y clientes en memoria (Test Double)
 monitoring/                     prometheus.yml y aprovisionamiento + tablero de Grafana
 .github/workflows/ci.yml        Integración continua (develop): ruff, mypy, import-linter, pruebas, SonarCloud
 .github/workflows/cd.yml        Despliegue continuo (main): imagen en GHCR y despliegue en EC2
 pyproject.toml                  Configuración de ruff, mypy e import-linter
 ```
 
-**Regla de dependencias** (la verifican `lint-imports` y `tests/unit/test_arquitectura.py`):
+**Regla de dependencias** (la verifica `lint-imports`):
 `api → business → infraestructure`, y todas pueden usar `core`. Ninguna capa importa de una
 capa superior. Los servicios no importan FastAPI, Pydantic, SQLAlchemy ni httpx: reciben
 interfaces. Solo `app/main.py` y `app/api/dependencies.py` conocen las clases concretas,
@@ -89,7 +93,73 @@ docker compose up --build     # usa docker-compose.yml + docker-compose.override
 | Estado | http://localhost:API_PUERTO_HOST/health |
 | Métricas | http://localhost:API_PUERTO_HOST/metrics |
 | Grafana | http://localhost:3820 (usuario y clave del `.env`) |
-| Prometheus | http://localhost:9090 |
+| Prometheus | http://localhost:9520 |
+
+**Puertos.** Ningún servicio usa el puerto por defecto de su producto, para no exponer puertos
+predecibles: API 8520, PostgreSQL 5520, Prometheus 9520, Grafana 3820 y node-exporter 9530
+(dentro de la red de Docker). En el host solo se publican `API_PUERTO_HOST` (del `.env`),
+y Prometheus y Grafana únicamente en `127.0.0.1`. En desarrollo PostgreSQL se publica en
+`127.0.0.1:POSTGRES_PUERTO_HOST` (5533 en `.env.example`).
+
+### Materiales
+
+| Método y ruta | Origen | Respuesta |
+|---|---|---|
+| `POST /materiales` | **HU-01** | 201 con el material y el mensaje de c7 · 400 (mensaje de c2) · 409 nombre repetido en el catálogo (c3) o en Inventario (c5) · 503 Inventario no disponible (c6) · 500 base de datos (c8) |
+| `GET /materiales` | HU-02 | 200 con página, totales y materiales; filtros opcionales por nombre, categoría, unidad y estado |
+| `GET /materiales/buscar?nombre=` | CRUD | 200 con los que contienen el texto (sin distinguir mayúsculas) |
+| `GET /materiales/{id}` | HU-02 | 200 con la ficha técnica de nueve campos · 404 si el ID no existe |
+| `PUT /materiales/{id}` | CRUD | 200 con el material actualizado · 404 · 409 nombre de otro material |
+| `DELETE /materiales/{id}` | CRUD | 204 · 404 |
+
+Cuerpo de POST y PUT: `{"nombre", "categoria", "unidadMedida", "densidad", "pureza"}`. El ID
+(`mat-NNN`), el SKU (lo asigna Inventario) y el estado (`ACTIVO` al registrar) son de solo
+lectura: cualquier campo extra se rechaza con 400. El material se devuelve con `materialId`,
+`sku`, los cinco campos, `estado`, `fechaRegistro` y `fechaUltimaActualizacion`.
+
+Ejemplo de HU-01 (Inventario debe estar configurado en `INVENTARIO_URL`; si no, responde 503):
+
+```bash
+curl -s -X POST localhost:$API_PUERTO_HOST/materiales -H 'Content-Type: application/json' \
+  -d '{"nombre": "Acero al carbono 1045", "categoria": "Materia Prima", "unidadMedida": "kg", "densidad": 7.85, "pureza": 98}'
+# 201 {"materialId": "mat-001", "sku": "MP-00001", ..., "estado": "ACTIVO",
+#      "mensaje": "Material 'Acero al carbono 1045' registrado exitosamente con el SKU MP-00001."}
+```
+
+### Fórmulas (HU-05)
+
+`POST /formulas` recibe `nombre` (letras y espacios, máximo 80 caracteres),
+`aplicacionTecnica` (alfanumérico, máximo 200) y `componentes`, con mínimo dos materiales
+distintos. Cada componente recibe únicamente `materialId` y `cantidad` (> 0, máximo seis
+dígitos enteros y tres decimales; entera si el material usa `und`). La unidad se toma del
+catálogo. No consulta, reserva ni descuenta existencias, ni llama a Inventario.
+
+```json
+{
+  "nombre": "Mezcla de corte",
+  "aplicacionTecnica": "Corte de acero 1045",
+  "componentes": [
+    {"materialId": "mat-001", "cantidad": 2.125},
+    {"materialId": "mat-002", "cantidad": 3}
+  ]
+}
+```
+
+Responde **201** con `formulaId` (`form-NNN` secuencial), nombre, aplicación técnica,
+versión 1, estado BORRADOR, fechas UTC iguales, componentes (SKU, nombre, cantidad y unidad)
+y el mensaje del backlog. Los errores responden **400** por contrato inválido,
+**422** por materiales inexistentes/inactivos o cantidad fraccionaria para `und`,
+**409** por nombre repetido sin distinguir mayúsculas y **500** por fallo de BD,
+con rollback y traceId. Fórmula, componentes y auditoría se guardan en una sola transacción.
+
+La migración `0004` agrega `formula`, `formula_componente` y `seq_formula`, sin modificar
+los datos de materiales. El downgrade elimina únicamente las tablas y secuencia de HU-05.
+No se implementan consultas, edición, descontinuación ni evaluación de patentes.
+
+```bash
+pytest tests/hu/test_hu05_registrar_formula.py
+pytest tests/integration/test_formula_api.py  # requiere TEST_DATABASE_URL
+```
 
 ### API en Python, base de datos en Docker (para desarrollar)
 
@@ -99,7 +169,7 @@ pip install -r requirements-dev.txt
 cp .env.example .env                       # completar y descomentar POSTGRES_HOST/POSTGRES_PORT
 docker compose up -d postgres              # PostgreSQL en localhost:POSTGRES_PUERTO_HOST
 alembic upgrade head
-uvicorn app.main:app --reload
+uvicorn app.main:app --reload --port 8520
 ```
 
 ---
@@ -114,6 +184,18 @@ pytest --cov --cov-report=term-missing     # cobertura (el CI exige 80 %)
 ruff check .                               # linter
 mypy                                       # type checker
 lint-imports                               # arquitectura: api -> business -> infraestructure -> core
+```
+
+**Análisis de seguridad (OWASP Top 10).** Lo corre el CI en cada PR y falla si hay hallazgos:
+`ruff check .` incluye las reglas de Bandit (`S`), y el job *Análisis de seguridad* corre
+Semgrep y pip-audit. Para correrlo en local, en un entorno virtual **aparte** (semgrep y FastAPI
+piden versiones distintas de opentelemetry):
+
+```bash
+python3.12 -m venv .venv-seguridad && .venv-seguridad/bin/pip install -r requirements-seguridad.txt
+.venv-seguridad/bin/semgrep scan --error --metrics=off --config p/owasp-top-ten --config p/python \
+  --config p/secrets --config p/dockerfile --config p/docker-compose --config p/github-actions
+.venv-seguridad/bin/pip-audit -r requirements.txt -r requirements-dev.txt   # dependencias con CVE conocidas (A06)
 ```
 
 Las pruebas de integración usan `TEST_DATABASE_URL` (sin valor por defecto; si no está
@@ -131,40 +213,42 @@ docker compose exec postgres sh -c 'createdb -U "$POSTGRES_USER" materiales_form
 
 HU-01 es el ejemplo de referencia: cada historia nueva recorre los mismos archivos.
 
-| Paso | HU-01 (ejemplo) |
-|---|---|
-| 1. Mensajes literales del backlog | `app/business/domain/mensajes.py` (`HU01_*`) |
-| 2. Reglas del dominio (objetos de valor, enums) | `NombreMaterial`, `Densidad`, `Pureza`, `Sku` en `value_objects.py` |
-| 3. Tabla y migración (si hace falta) | `models/material.py` + `alembic revision --autogenerate` |
-| 4. Contrato del repositorio y su implementación | `interfaces/material_repository.py`, `repositories/material_repository.py` |
-| 5. Comando de entrada del caso de uso | `RegistrarMaterialComando` en `services/comandos.py` |
-| 6. Servicio | `MaterialService.registrar` en `services/material_service.py` |
-| 7. DTO de entrada y salida | `MaterialCrearSolicitud` / `MaterialRespuesta` en `api/schemas/materiales.py` |
-| 8. Ruta | `api/routers/materiales.py` (y `include_router` en `main.py` si es un router nuevo) |
-| 9. Inyección de dependencias | `obtener_material_service` en `api/dependencies.py` |
-| 10. Pruebas de aceptación | `tests/hu/test_hu01_registrar_material.py` |
+| Paso | Dónde | HU-01 (ejemplo) |
+|---|---|---|
+| 1. Mensajes literales del backlog | `app/business/domain/mensajes.py` | `HU01_C2_1` … `HU01_C8` |
+| 2. Reglas del dominio (objetos de valor, enums) | `app/business/domain/` | `NombreMaterial`, `Densidad`, `Pureza`, `Sku`, `EstadoMaterial` |
+| 3. Tabla y migración (si hace falta) | `infraestructure/models/<tabla>.py` (importarla en `models/__init__.py`) + `alembic revision --autogenerate` | `models/material.py` + `0003_material_hu01.py` |
+| 4. Contrato del repositorio y su implementación | `infraestructure/interfaces/` y `infraestructure/repositories/` | `existe_nombre`, `siguiente_numero`, `agregar` |
+| 5. Cliente de otra célula (si hace falta) | Interfaz que hereda de `IClienteExterno` + clase que hereda de `ClienteHttpBase`; registrarlo en `app.state.clientes_externos` (`main.py`) | `IInventarioClient` + `InventarioClient` |
+| 6. Comando de entrada del caso de uso | `app/business/services/comandos.py` | `RegistrarMaterialComando` |
+| 7. Servicio | `app/business/services/<recurso>_service.py`, heredando de `ServicioBase` | `MaterialService.registrar` |
+| 8. DTO de entrada y salida | `app/api/schemas/<recurso>.py`, heredando de `EsquemaEntrada` / `EsquemaSalida` | `MaterialCrearSolicitud`, `MaterialRegistradoRespuesta` |
+| 9. Ruta | `app/api/routers/<recurso>.py` + `include_router` en `main.py` + etiqueta en `core/openapi.py` | `POST /materiales` |
+| 10. Inyección de dependencias | `obtener_<recurso>_service` en `app/api/dependencies.py` | `obtener_material_service`, `obtener_cliente_inventario` |
+| 11. Pruebas de aceptación | `tests/hu/test_huXX_*.py` (y los dobles que haga falta en `tests/dobles`) | `tests/hu/test_hu01_registrar_material.py` |
 
 **Validación de entrada (400).** En el DTO, la tabla `mensajes_error` asocia cada
 `(campo en camelCase, tipo de error de Pydantic)` con su mensaje (`"*"` = cualquier error del
 campo) y los `@field_validator` usan los objetos de valor y lanzan `error_de_negocio(mensaje)`.
 El manejador global responde 400 con ese texto y el traceId.
 
-**Servicio.** Patrón general (ver `MaterialService.registrar`):
+**Servicio.** Patrón general:
 
 ```python
-@operacion_de_negocio("REGISTRAR_MATERIAL", RECURSO, mensaje_error_bd=mensajes.HU01_C8,
-                      mensaje_servicio_externo=mensajes.HU01_C6)
-async def registrar(self, comando):
-    async with self._uow:                                   # Unit of Work: una transacción
-        if await self._materiales.existe_nombre(nombre):
-            raise ConflictoError(formatear(mensajes.HU01_C3, Nombre=nombre))
-    ...
-    async with self._uow:
-        self._materiales.agregar(material)
-        self._auditar("REGISTRAR_MATERIAL", RECURSO, material.id_material, 201)
-        await self._uow.commit()
-    self._publicar(TipoEvento.MATERIAL_REGISTRADO, materialId=material.id_material)
-    return Resultado(material, formatear(mensajes.HU01_C7, Nombre=nombre, SKU=sku))
+class MaterialService(ServicioBase):
+    @operacion_de_negocio("REGISTRAR_MATERIAL", "material", mensaje_error_bd=mensajes.HU01_C8,
+                          mensaje_servicio_externo=mensajes.HU01_C6)
+    async def registrar(self, comando: RegistrarMaterialComando) -> Resultado[Material]:
+        async with self._uow:                                   # Unit of Work: una transacción
+            if await self._materiales.existe_nombre(comando.nombre):
+                raise ConflictoError(formatear(mensajes.HU01_C3, Nombre=comando.nombre))
+        ...
+        async with self._uow:
+            await self._materiales.agregar(material)
+            self._auditar("REGISTRAR_MATERIAL", "material", material.id_material, 201)
+            await self._uow.commit()
+        self._publicar(TipoEvento.MATERIAL_REGISTRADO, materialId=material.id_material)
+        return Resultado(material, formatear(mensajes.HU01_C7, Nombre=comando.nombre, SKU=sku))
 ```
 
 No hace falta capturar los fallos de base de datos ni de las APIs externas: el decorador
@@ -173,9 +257,11 @@ rechazos en la auditoría. Mientras una ruta exista sin su lógica, el servicio 
 `NoImplementadoError("HU-XX")` (responde 501).
 
 **Pruebas.** `tests/hu/test_huXX_*.py` con una prueba por criterio (código HTTP y mensaje).
-Para probar sin base de datos, reemplazar el servicio con `app.dependency_overrides` y los
-dobles de `tests/dobles` (como el fixture `escenario` de HU-01). `pytest` en verde y Pull
-Request con la plantilla.
+Para probar sin base de datos, reemplazar el servicio o sus dependencias con
+`app.dependency_overrides` y los dobles de `tests/dobles` (como el fixture `escenario` de
+HU-01). Al agregar una tabla o secuencia, sumarla a `TABLAS` o `SECUENCIAS` en
+`tests/integration/conftest.py`. `pytest` en
+verde y Pull Request con la plantilla.
 
 ---
 
@@ -184,18 +270,25 @@ Request con la plantilla.
 ```bash
 alembic upgrade head                          # aplicar migraciones (el contenedor lo hace al arrancar)
 alembic revision --autogenerate -m "cambio"   # nueva migración después de cambiar un modelo
-alembic check                                 # falla si modelos y migraciones difieren (lo prueba la suite)
+alembic check                                 # falla si modelos y migraciones difieren
 ```
 
-- Tablas: `material` y `auditoria` (las del resto del MER se agregan con nuevas migraciones
-  cuando se implementen sus historias).
-- ID `mat-NNN` desde la secuencia `seq_material` de PostgreSQL (mínimo 3 dígitos; una
-  transacción revertida deja un salto en la numeración).
-- Nombre único sin distinguir mayúsculas: índice `lower(nombre)` en `material`.
+- Tablas: `auditoria` (0001) y `material` (0003, HU-01). Las del MER se agregan con nuevas
+  migraciones cuando se implementen sus historias.
+- `material`: ID `mat-NNN` desde la secuencia `seq_material` de PostgreSQL (mínimo 3
+  dígitos; una transacción revertida deja un salto en la numeración), SKU único, estado
+  (`ACTIVO`/`INACTIVO`), nombre único sin distinguir mayúsculas (índice `lower(nombre)`) y
+  restricciones CHECK de categoría, unidad de medida, densidad (> 0), pureza (0 a 100) y estado.
 - Fechas `TIMESTAMP WITH TIME ZONE` (UTC), devueltas en ISO 8601.
 
-> La migración `0001` se reescribió en el sprint 0 para dejar solo estas dos tablas. Si tienen
-> una base local creada con la versión anterior, recréenla: `docker compose down -v` y
+> La migración `0003` reemplaza la tabla `material` del CRUD básico (`0002`, ID numérico, sin
+> SKU ni estado). Sus filas no se pueden convertir porque el SKU solo lo asigna Inventario, así
+> que no se borran: quedan en `material_crud_respaldo` (sin modelo ORM; `migrations/env.py`
+> la excluye del autogenerate). El downgrade a `0002` la restaura. Cuando el equipo confirme
+> que no se necesitan, se elimina con una migración nueva.
+
+> La migración `0001` se reescribió para dejar solo la tabla `auditoria`. Si tienen una base
+> local creada con una versión anterior, recréenla: `docker compose down -v` y
 > `docker compose up` (borra los datos del volumen).
 
 ---
@@ -208,7 +301,10 @@ alembic check                                 # falla si modelos y migraciones d
 | Configuración | `INVENTARIO_URL`, `INVENTARIO_RUTA_MATERIAS_PRIMAS` |
 | Contrato por acordar | Nombres de los campos JSON y código HTTP del nombre repetido: constantes en `app/infraestructure/clients/inventario_client.py` |
 
-Todas las llamadas salientes tienen timeout total de 5 s, circuit breaker (5 fallos seguidos
+Patent Sweep aún no tiene cliente: se crea con HU-09 (su URL ya se configura con `PATENT_SWEEP_URL`).
+
+Todo cliente hereda de `ClienteHttpBase` (`app/infraestructure/clients/base.py`), así que sus
+llamadas salientes tienen timeout total de 5 s, circuit breaker (5 fallos seguidos
 lo abren por 30 s; configurable) y envían las cabeceras `X-Trace-Id` y `X-Servicio-Origen`.
 Pedimos a las otras células que nos envíen las mismas cabeceras: el traceId se reutiliza y el
 origen queda en la auditoría.
@@ -228,7 +324,7 @@ origen queda en la auditoría.
 | `ReglaDeNegocioError` | 422 |
 | `ErrorInterno` (BD caída o timeout) / cualquier error no controlado | 500 |
 | `NoImplementadoError` (HU pendiente) | 501 |
-| `DependenciaNoDisponibleError` (Inventario) | 503 |
+| `DependenciaNoDisponibleError` (API de otra célula) | 503 |
 
 - Logs: una línea JSON por evento en la salida estándar (`docker compose logs api`), con
   `traceId` y `origen`. Buscar un error por su traceId: `docker compose logs api | grep <traceId>`.
@@ -241,7 +337,7 @@ origen queda en la auditoría.
 ## 8. Monitoreo
 
 - `GET /health`: 200 si la API alcanza su base de datos, 503 si no; incluye el estado del
-  circuit breaker de Inventario. Lo usan el `HEALTHCHECK` de Docker y el pipeline después de desplegar.
+  circuit breaker de cada cliente registrado en `app.state.clientes_externos`. Lo usan el `HEALTHCHECK` de Docker y el pipeline después de desplegar.
 - `GET /metrics`: peticiones por ruta y código, latencia, memoria del proceso, llamadas a otras
   células, circuit breakers y eventos de negocio.
 - Prometheus recoge la API y node-exporter (CPU, memoria y disco de la EC2) cada 15 s.
@@ -254,10 +350,13 @@ origen queda en la auditoría.
 
 **Integración continua** (`.github/workflows/ci.yml`), en cada Pull Request y push a `develop`:
 
-1. Calidad: linter (`ruff`), type checker (`mypy`) y validación de arquitectura (`import-linter`).
-2. Pruebas unitarias y de integración contra PostgreSQL (levantado con `docker compose`),
+1. Calidad: linter (`ruff`, con las reglas de seguridad de Bandit), type checker (`mypy`) y
+   validación de arquitectura (`import-linter`).
+2. Seguridad: Semgrep (OWASP Top 10, secretos, Dockerfile, compose y GitHub Actions) y
+   pip-audit (dependencias con vulnerabilidades conocidas).
+3. Pruebas unitarias y de integración contra PostgreSQL (levantado con `docker compose`),
    cobertura mínima del 80 % y análisis de SonarCloud con quality gate.
-3. Build de la imagen Docker (sin publicarla).
+4. Build de la imagen Docker (sin publicarla).
 
 **Despliegue continuo** (`.github/workflows/cd.yml`), en cada push a `main` (al fusionar `develop`):
 se publica la imagen en GHCR (`ghcr.io/<propietario>/materiales-formulas-api:<commit>` y `:latest`)
@@ -267,7 +366,8 @@ y se despliega en la EC2 por SSH; al final se verifica `/health`.
 
 1. *Settings → Branches*: regla para `develop` con "Require a pull request before merging",
    1 aprobación y los checks obligatorios **Linter, type checker y arquitectura**,
-   **Pruebas, cobertura y SonarCloud** y **Build de la imagen Docker**; regla para `main` con
+   **Análisis de seguridad (OWASP)**, **Pruebas, cobertura y SonarCloud** y
+   **Build de la imagen Docker**; regla para `main` con
    "Require a pull request before merging" (solo se fusiona `develop`).
 2. *Settings → Secrets and variables → Actions*: `SONAR_TOKEN`, `EC2_HOST`, `EC2_USUARIO`,
    `EC2_LLAVE_SSH`, `POSTGRES_USER` y `POSTGRES_PASSWORD` (BD de pruebas del CI), y opcionalmente
@@ -285,10 +385,10 @@ mkdir -p ~/materiales-formulas && cd ~/materiales-formulas
 nano .env      # copiar .env.example y completar: usuarios, claves y URLs de las otras células
 ```
 
-Grupo de seguridad: 22 (SSH del pipeline) y `API_PUERTO_HOST` (API), abierto solo a las IP de
-las EC2 de las otras células.
+Grupo de seguridad: 22 (SSH del pipeline) y `API_PUERTO_HOST` (API), abierto a todas las ipv4 
+usando la clave pem como seguridad.
 PostgreSQL y node-exporter no se publican; Prometheus y Grafana solo escuchan en localhost de
-la EC2 (`ssh -L 9090:localhost:9090 -L 3820:localhost:3820 ...` para verlos).
+la EC2 (`ssh -L 9520:localhost:9520 -L 3820:localhost:3820 ...` para verlos).
 
 **Volver a una versión anterior** (en la EC2):
 `API_IMAGEN=ghcr.io/<propietario>/materiales-formulas-api API_TAG=<commit anterior> docker compose up -d api`.
@@ -299,7 +399,7 @@ la EC2 (`ssh -L 9090:localhost:9090 -L 3820:localhost:3820 ...` para verlos).
 
 | Patrón / táctica | Dónde |
 |---|---|
-| Layered Architecture | `app/api`, `app/business`, `app/infraestructure`, `app/core` + `lint-imports` y `tests/unit/test_arquitectura.py` |
+| Layered Architecture | `app/api`, `app/business`, `app/infraestructure`, `app/core` + `lint-imports` |
 | DTO · Canonical Schema | `app/api/schemas/` (camelCase, `extra="forbid"`) |
 | Tabla de auditoría | `app/infraestructure/models/auditoria.py`, `repositories/auditoria_repository.py`, `ServicioBase._auditar` |
 | Observer | `app/core/events.py` (suscriptores: log y métricas) |
@@ -313,15 +413,14 @@ la EC2 (`ssh -L 9090:localhost:9090 -L 3820:localhost:3820 ...` para verlos).
 | Object Pool | Pool de conexiones (`database.py`) y un `httpx.AsyncClient` compartido (`main.py`) |
 | Gateway | `app/infraestructure/clients/` |
 | Repository | `app/infraestructure/interfaces/` + `app/infraestructure/repositories/` |
-| Value Object | `app/business/domain/value_objects.py` |
 | Service Layer | `app/business/services/` |
 | Externalized Configuration | `app/core/config.py`, `.env.example`, `docker-compose.yml`, secretos de GitHub |
 | Application Metrics · Health Endpoint | `app/core/metrics.py`, `/metrics`, `app/api/routers/health.py` |
 | Contenerización · límites de recursos | `Dockerfile`, `docker-compose.yml` |
 | Test Double | `tests/dobles/` |
 
-Los patrones que dependen de historias aún no implementadas (Soft Delete en HU-04,
-Pagination, Specification y State en las fórmulas) se agregan junto con esas historias.
+Los patrones que dependen de historias aún no implementadas (Value Object, Soft Delete en
+HU-04, Pagination, Specification y State en las fórmulas) se agregan junto con esas historias.
 
 RBAC no está implementado: el DAS excluye la autenticación del alcance, así que no hay roles
 que verificar.
@@ -334,10 +433,8 @@ que verificar.
 
 1. **Inventario**: nombres de los campos JSON del alta, campo con el Código de artículo en la
    respuesta y código HTTP con que rechaza un nombre repetido (se asumió 409; constantes en
-   `inventario_client.py`).
-2. **Patent Sweep** (HU-09, aún sin implementar): URL y ruta de su API para la solicitud de
-   evaluación (`PATENT_SWEEP_URL` y `PATENT_SWEEP_RUTA_EVALUACION`, ya definidas en
-   `.env.example`, `docker-compose.yml` y `config.py`).
+   `inventario_client.py`). Rutas y contratos de las operaciones de las demás historias.
+2. **Patent Sweep** (HU-09): ruta y contrato de la solicitud de evaluación.
 3. URLs de las EC2 de ambas células y uso de las cabeceras `X-Trace-Id` y `X-Servicio-Origen`.
 
 ### Vacíos del backlog en HU-01 (confirmar con el PO)
@@ -345,11 +442,14 @@ que verificar.
 1. Un campo enviado con `null`, o un Nombre vacío o solo con espacios, se trata como omitido
    (mensaje "es obligatorio").
 2. Un Nombre que no es texto (p. ej. un número JSON) responde "contiene caracteres no permitidos".
-3. Si Inventario devuelve un Código de artículo que no tiene el formato MP-00000, se trata como
+3. "Máximo N caracteres" en Densidad y Pureza cuenta dígitos y punto decimal del número sin
+   ceros a la derecha del decimal (7.850 → "7.85" → 4 caracteres).
+4. Si Inventario devuelve un Código de artículo que no tiene el formato MP-00000, se trata como
    una falla de Inventario (503 con el mensaje de c6) y no se guarda el material.
-4. Si dos peticiones registran el mismo nombre a la vez, el índice único rechaza la segunda y
+5. Si dos peticiones registran el mismo nombre a la vez, el índice único rechaza la segunda y
    se responde 409 con el mensaje de c3 (Inventario ya habrá registrado el artículo; queda en
    el log con su SKU).
+6. El ID usa mínimo 3 dígitos (mat-001 … mat-999, mat-1000).
 
 ### Decisiones tomadas en este código
 
@@ -361,8 +461,8 @@ que verificar.
 - Imagen `postgres:16` (Debian) en lugar de Alpine, para que `lower()` trate bien las tildes.
 - Los rechazos por validación del DTO (400) quedan en el log, no en la tabla de auditoría
   (no llegan a la capa de negocio).
-- `/health` responde 503 solo si falla la base de datos propia; si Inventario falla, la API
-  sigue sana y las operaciones que lo usan responden 503.
+- `/health` responde 503 solo si falla la base de datos propia; si otra célula falla, la API
+  sigue sana y las operaciones que la usan responden 503.
 - Un solo proceso de Uvicorn (las métricas viven en memoria del proceso).
 - Diferencias con la tabla de atributos del DAS: el código usa `app/api/routers`,
   `app/business/services` y `app/api/exception_handlers.py` (secciones 1.5 y 2); en la tabla

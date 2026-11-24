@@ -5,8 +5,8 @@ viven mientras corre el proceso (patrones Object Pool e inyección con instancia
 compartidas):
 
 * El motor de SQLAlchemy con su pool de conexiones y la fábrica de sesiones.
-* Un único ``httpx.AsyncClient`` (reutiliza conexiones) y el cliente de Inventario con
-  su circuit breaker.
+* Un único ``httpx.AsyncClient`` (reutiliza conexiones) que comparten los clientes de
+  las APIs de otras células, cada uno con su circuit breaker.
 * El bus de eventos de dominio con sus suscriptores (log y métricas).
 
 También registra el middleware de traceId, el manejador global de excepciones, los
@@ -22,7 +22,7 @@ from fastapi import FastAPI
 
 from app.api.exception_handlers import registrar_manejadores
 from app.api.middleware import TraceIdMiddleware
-from app.api.routers import health, materiales
+from app.api.routers import formulas, health, materiales
 from app.core.config import Configuracion, obtener_configuracion
 from app.core.events import BusEventos, registrar_evento_en_log
 from app.core.logging import configurar_logging
@@ -53,9 +53,12 @@ async def ciclo_de_vida(app: FastAPI) -> AsyncIterator[None]:
     app.state.motor = motor
     app.state.fabrica_sesiones = crear_fabrica_sesiones(motor)
     app.state.cliente_http = http
-    app.state.cliente_inventario = InventarioClient(
-        http, config, CircuitBreaker(SERVICIO_INVENTARIO, config.cb_umbral_fallos, config.cb_tiempo_abierto_s)
-    )
+    # Clientes de otras células por nombre de servicio (aparecen en /health).
+    app.state.clientes_externos = {
+        SERVICIO_INVENTARIO: InventarioClient(
+            http, config, CircuitBreaker(SERVICIO_INVENTARIO, config.cb_umbral_fallos, config.cb_tiempo_abierto_s)
+        ),
+    }
     app.state.bus_eventos = crear_bus_eventos()
     logger.info(
         "API iniciada",
@@ -90,6 +93,7 @@ def crear_app(config: Configuracion | None = None) -> FastAPI:
 
     app.include_router(health.router)
     app.include_router(materiales.router)
+    app.include_router(formulas.router)
 
     configurar_metricas(app)
     ajustar_openapi(app)

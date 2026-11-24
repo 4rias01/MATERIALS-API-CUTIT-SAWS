@@ -1,4 +1,4 @@
-"""DTO del recurso /materiales (HU-01 y HU-02)."""
+"""DTO del recurso /materiales (HU-01 y CRUD básico)."""
 
 from datetime import datetime
 from decimal import Decimal
@@ -12,7 +12,7 @@ from app.business.domain import mensajes
 from app.business.domain.enums import Categoria, EstadoMaterial, UnidadMedida
 from app.business.domain.errores import Motivo, ValorInvalidoError
 from app.business.domain.value_objects import Densidad, NombreMaterial, Pureza, normalizar_nombre
-from app.business.services.comandos import RegistrarMaterialComando
+from app.business.services.comandos import DatosMaterial, RegistrarMaterialComando
 from app.business.services.material_service import FiltrosMaterial
 
 # ---------------------------------------------------------------------------------------
@@ -25,7 +25,8 @@ class MaterialCrearSolicitud(EsquemaEntrada):
 
     Los campos se validan en el orden del criterio 1 y se responde 400 con el mensaje del
     primero que falla. Un campo enviado con ``null`` o un nombre vacío cuentan como
-    omitidos (mensaje "es obligatorio").
+    omitidos (mensaje "es obligatorio"). Los campos desconocidos o de solo lectura (id,
+    SKU, estado) se rechazan con 400 (OWASP A01/A08, asignación masiva).
     """
 
     mensajes_error: ClassVar[dict[tuple[str, str], str]] = {
@@ -102,6 +103,42 @@ class MaterialCrearSolicitud(EsquemaEntrada):
         )
 
 
+class MaterialActualizarSolicitud(EsquemaEntrada):
+    """Cuerpo de PUT /materiales/{id} (CRUD básico; lo reemplazará HU-03).
+
+    El id va en la ruta y el SKU y el estado no se editan: los campos desconocidos o de
+    solo lectura se rechazan con 400 (OWASP A01/A08, asignación masiva).
+    """
+
+    nombre: str = Field(min_length=3, max_length=100, examples=["Acero al carbono 1045"])
+    categoria: Categoria = Field(examples=["Materia Prima"])
+    unidad_medida: UnidadMedida = Field(examples=["kg"])
+    densidad: DecimalEntrada = Field(gt=0, max_digits=8, decimal_places=4, examples=[7.85])
+    pureza: DecimalEntrada = Field(ge=0, le=100, max_digits=5, decimal_places=2, examples=[98])
+
+    @field_validator("nombre", mode="before")
+    @classmethod
+    def _normalizar_nombre(cls, valor: Any) -> Any:
+        """Quita los espacios al inicio y al final y reduce a uno los repetidos."""
+        return " ".join(valor.split()) if isinstance(valor, str) else valor
+
+    @classmethod
+    def mensaje_para_error(cls, error: ErrorDetails, datos: Any) -> str | None:
+        """Un mensaje por campo; los campos desconocidos usan el mensaje genérico."""
+        if error["type"] == "extra_forbidden" or not error["loc"]:
+            return None
+        return mensajes.formatear(mensajes.MATERIAL_CAMPO_INVALIDO, campo=error["loc"][0])
+
+    def a_datos(self) -> DatosMaterial:
+        return DatosMaterial(
+            nombre=self.nombre,
+            categoria=self.categoria.value,
+            unidad_medida=self.unidad_medida.value,
+            densidad=self.densidad,
+            pureza=self.pureza,
+        )
+
+
 class ConsultaMaterial(EsquemaEntrada):
     nombre: str | None = Field(default=None, max_length=100)
     categoria: Categoria | None = None
@@ -157,24 +194,35 @@ class ListaMateriales(EsquemaSalida):
 
 
 class MaterialRespuesta(FichaMaterial):
-    """Material creado y mensaje (HU-01 c7)."""
-
     fecha_ultima_actualizacion: datetime
+
+    @classmethod
+    def desde_modelo(cls, material: Any) -> Self:
+        """Construye el DTO desde el Material que devuelve el servicio (la capa de
+        presentación no importa los modelos de la capa de acceso a datos)."""
+        return cls(**_campos(material))
+
+
+class MaterialRegistradoRespuesta(MaterialRespuesta):
+    """Material creado y mensaje (HU-01 c7: 201)."""
+
     mensaje: str = Field(examples=["Material 'Acero al carbono 1045' registrado exitosamente con el SKU MP-00001."])
 
     @classmethod
-    def desde_modelo(cls, material: Any, mensaje: str) -> Self:
-        """Construye el DTO desde el modelo Material que devuelve el servicio."""
-        return cls(
-            material_id=material.id_material,
-            sku=material.sku,
-            nombre=material.nombre,
-            categoria=material.categoria,
-            unidad_medida=material.unidad_medida,
-            densidad=Decimal(material.densidad),
-            pureza=Decimal(material.pureza),
-            fecha_registro=material.fecha_registro,
-            estado=material.estado,
-            fecha_ultima_actualizacion=material.fecha_actualizacion,
-            mensaje=mensaje,
-        )
+    def con_mensaje(cls, material: Any, mensaje: str) -> Self:
+        return cls(**_campos(material), mensaje=mensaje)
+
+
+def _campos(material: Any) -> dict[str, Any]:
+    return {
+        "material_id": material.id_material,
+        "sku": material.sku,
+        "nombre": material.nombre,
+        "categoria": Categoria(material.categoria),
+        "unidad_medida": UnidadMedida(material.unidad_medida),
+        "densidad": Decimal(material.densidad),
+        "pureza": Decimal(material.pureza),
+        "fecha_registro": material.fecha_registro,
+        "estado": EstadoMaterial(material.estado),
+        "fecha_ultima_actualizacion": material.fecha_actualizacion,
+    }

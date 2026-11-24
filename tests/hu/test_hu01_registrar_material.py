@@ -189,7 +189,7 @@ async def test_c02_rechaza_campos_de_solo_lectura(cliente: httpx.AsyncClient, es
 async def test_c03_responde_409_si_el_nombre_ya_existe_sin_distinguir_mayusculas(
     cliente: httpx.AsyncClient, escenario: Escenario
 ) -> None:
-    escenario.materiales.agregar(un_material(1, nombre="Ácido Cítrico"))
+    escenario.materiales.sembrar(un_material(1, nombre="Ácido Cítrico"))
     r = await cliente.post("/materiales", json=_cuerpo(nombre="  ÁCIDO   cítrico "))
     assert r.status_code == 409
     assert r.json()["mensaje"] == formatear(mensajes.HU01_C3, Nombre="ÁCIDO cítrico")

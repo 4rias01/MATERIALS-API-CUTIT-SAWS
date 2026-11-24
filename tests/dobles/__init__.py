@@ -11,11 +11,12 @@ Los repositorios guardan en memoria y no simulan el rollback: para probar una
 reversión, verificar ``uow.confirmaciones`` y ``uow.reversiones``.
 """
 
-from tests.dobles.clientes import InventarioClientFalso
+from tests.dobles.clientes import ClienteExternoFalso, InventarioClientFalso
 from tests.dobles.repositorios import AuditoriaRepositoryFalso, MaterialRepositoryFalso, UnitOfWorkFalsa
 
 __all__ = [
     "AuditoriaRepositoryFalso",
+    "ClienteExternoFalso",
     "InventarioClientFalso",
     "MaterialRepositoryFalso",
     "UnitOfWorkFalsa",

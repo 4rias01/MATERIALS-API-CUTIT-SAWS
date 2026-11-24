@@ -13,13 +13,13 @@ pytestmark = pytest.mark.hu
 @pytest.fixture
 def catalogo(app: FastAPI) -> MaterialRepositoryFalso:
     repo = MaterialRepositoryFalso([un_material(i) for i in range(11, 0, -1)])
-    repo.agregar(un_material(12, nombre="Aceite mineral", categoria="Lubricantes", unidad_medida="L", estado="INACTIVO"))
+    repo.sembrar(un_material(12, nombre="Aceite mineral", categoria="Lubricantes", unidad_medida="L", estado="INACTIVO"))
     app.dependency_overrides[obtener_repositorio_materiales] = lambda: repo
     return repo
 
 
 def test_c01_id_obligatorio(app: FastAPI) -> None:
-    parametro, = app.openapi()["paths"]["/materiales/{id}"]["get"]["parameters"]
+    parametro, = app.openapi()["paths"]["/materiales/{id_material}"]["get"]["parameters"]
     assert parametro["required"] and parametro["schema"]["type"] == "string"
     assert "mat-NNN" in parametro["description"]
 

@@ -17,9 +17,10 @@ class Base(DeclarativeBase):
     metadata = MetaData(naming_convention=CONVENCION_NOMBRES)
 
 
-# Secuencia del consecutivo mat-NNN. Un número consumido en una transacción que se
-# revierte no se reutiliza (puede haber saltos en la numeración).
+# Secuencia del consecutivo mat-NNN (HU-01 c7.1). Un número consumido en una transacción
+# que se revierte no se reutiliza (puede haber saltos en la numeración).
 SECUENCIA_MATERIAL = Sequence("seq_material", metadata=Base.metadata)
+SECUENCIA_FORMULA = Sequence("seq_formula", metadata=Base.metadata)
 
 
 def lista_sql(valores: tuple[str, ...]) -> str:
