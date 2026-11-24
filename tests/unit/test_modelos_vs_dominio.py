@@ -12,7 +12,7 @@ def test_valores_permitidos_iguales_en_modelo_y_dominio() -> None:
 
 
 def test_tablas_del_mer() -> None:
-    assert set(Base.metadata.tables) == {"material", "auditoria"}
+    assert set(Base.metadata.tables) == {"material", "auditoria", "formula", "formula_componente"}
 
 
 def test_la_auditoria_no_tiene_llaves_foraneas() -> None:

@@ -3,14 +3,15 @@
 API REST de la célula 1 de la plataforma backend de Cutit Saws (Desarrollo de Software II, 2026-2).
 Implementa el **DAS v1.2** del módulo y el **product backlog V1.3**.
 
-> **Estado: arquetipo + HU-01 (registrar material) + CRUD básico de materiales.** La
+> **Estado: arquetipo + HU-01 (registrar material) + HU-05 (registrar fórmula) + CRUD básico de materiales.** La
 > infraestructura transversal funciona, **HU-01 está implementada de punta a punta** (es el
 > ejemplo de referencia para las demás historias, sección 4) y el resto de `/materiales`
 > (consultar, actualizar y eliminar) es el CRUD básico del dojo, que reemplazarán HU-02 a HU-04.
 
 | Funciona hoy | Pendiente |
 |---|---|
-| Arquitectura en capas, inyección de dependencias, configuración por variables de entorno | HU-02 a HU-11 (rutas, DTO, servicios, tablas, clientes y pruebas) |
+| Arquitectura en capas, inyección de dependencias, configuración por variables de entorno | HU-02 a HU-04 y HU-06 a HU-11 (rutas, DTO, servicios, tablas, clientes y pruebas) |
+| HU-05: `POST /formulas`, validación de componentes activos, registro en BORRADOR y ficha técnica | |
 | HU-01 completa: DTO con los mensajes del criterio 2, servicio, repositorio y alta en Inventario | Contrato POR ACORDAR con Inventario y Patent Sweep (sección 11) |
 | CRUD básico de materiales: listar, buscar por id o por nombre, actualizar y eliminar | |
 | Modelos ORM y migraciones Alembic de `auditoria` y `material` | |
@@ -124,6 +125,41 @@ curl -s -X POST localhost:$API_PUERTO_HOST/materiales -H 'Content-Type: applicat
   -d '{"nombre": "Acero al carbono 1045", "categoria": "Materia Prima", "unidadMedida": "kg", "densidad": 7.85, "pureza": 98}'
 # 201 {"materialId": "mat-001", "sku": "MP-00001", ..., "estado": "ACTIVO",
 #      "mensaje": "Material 'Acero al carbono 1045' registrado exitosamente con el SKU MP-00001."}
+```
+
+### Fórmulas (HU-05)
+
+`POST /formulas` recibe `nombre` (letras y espacios, máximo 80 caracteres),
+`aplicacionTecnica` (alfanumérico, máximo 200) y `componentes`, con mínimo dos materiales
+distintos. Cada componente recibe únicamente `materialId` y `cantidad` (> 0, máximo seis
+dígitos enteros y tres decimales; entera si el material usa `und`). La unidad se toma del
+catálogo. No consulta, reserva ni descuenta existencias, ni llama a Inventario.
+
+```json
+{
+  "nombre": "Mezcla de corte",
+  "aplicacionTecnica": "Corte de acero 1045",
+  "componentes": [
+    {"materialId": "mat-001", "cantidad": 2.125},
+    {"materialId": "mat-002", "cantidad": 3}
+  ]
+}
+```
+
+Responde **201** con `formulaId` (`form-NNN` secuencial), nombre, aplicación técnica,
+versión 1, estado BORRADOR, fechas UTC iguales, componentes (SKU, nombre, cantidad y unidad)
+y el mensaje del backlog. Los errores responden **400** por contrato inválido,
+**422** por materiales inexistentes/inactivos o cantidad fraccionaria para `und`,
+**409** por nombre repetido sin distinguir mayúsculas y **500** por fallo de BD,
+con rollback y traceId. Fórmula, componentes y auditoría se guardan en una sola transacción.
+
+La migración `0004` agrega `formula`, `formula_componente` y `seq_formula`, sin modificar
+los datos de materiales. El downgrade elimina únicamente las tablas y secuencia de HU-05.
+No se implementan consultas, edición, descontinuación ni evaluación de patentes.
+
+```bash
+pytest tests/hu/test_hu05_registrar_formula.py
+pytest tests/integration/test_formula_api.py  # requiere TEST_DATABASE_URL
 ```
 
 ### API en Python, base de datos en Docker (para desarrollar)
