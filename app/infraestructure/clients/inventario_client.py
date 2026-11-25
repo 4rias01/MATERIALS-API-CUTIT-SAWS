@@ -22,6 +22,8 @@ CAMPO_CODIGO_ARTICULO = "codigo"  # en la respuesta del alta: el Código de art�
 CAMPO_MENSAJE = "mensaje"  # en las respuestas de error
 ESTADO_NOMBRE_DUPLICADO = 409  # "Ya existe un artículo con el nombre [Nombre]" (HU-01 c5)
 ESTADOS_ALTA_EXITOSA = (200, 201)
+# HU-03: códigos de éxito del PATCH. POR ACORDAR con la célula de Inventario.
+ESTADOS_ACTUALIZACION_EXITOSA = (200, 204)
 # ----------------------------------------------------------------------------------------
 
 
@@ -36,6 +38,7 @@ class InventarioClient(ClienteHttpBase, IInventarioClient):
             nombre_origen=config.nombre_servicio,
         )
         self._ruta_materias_primas = config.inventario_ruta_materias_primas
+        self._ruta_articulos = config.inventario_ruta_articulos
 
     async def registrar_materia_prima(self, nombre: str, unidad_medida: str) -> str:
         respuesta = await self._enviar(
@@ -51,3 +54,15 @@ class InventarioClient(ClienteHttpBase, IInventarioClient):
         if not isinstance(codigo, str) or not codigo:
             raise self._respuesta_inesperada(respuesta)
         return codigo
+
+    async def actualizar_articulo(self, codigo: str, nombre: str) -> None:
+        """HU-03 c4: PATCH /inventario/articulos/{codigo} con el nuevo Nombre."""
+        respuesta = await self._enviar(
+            "PATCH",
+            f"{self._ruta_articulos}/{codigo}",
+            json={CAMPO_NOMBRE: nombre},
+        )
+        if respuesta.status_code == ESTADO_NOMBRE_DUPLICADO:
+            raise NombreDuplicadoEnInventarioError(self._json(respuesta).get(CAMPO_MENSAJE))
+        if respuesta.status_code not in ESTADOS_ACTUALIZACION_EXITOSA:
+            raise self._respuesta_inesperada(respuesta)

@@ -99,6 +99,46 @@ HU05_C9_3 = "El material '[IDMaterial]' está repetido en la tabla de Componente
 HU05_C9_4 = "El campo 'Unidad de medida' es de solo lectura: el sistema la toma del material registrado."
 
 
+# HU-03 · Modificar material -------------------------------------------------------------
+# c2.1 · 400
+HU03_C2_1 = "El campo 'SKU' es de solo lectura y no puede ser modificado."
+# c2.2 · 400
+HU03_C2_2 = "El campo 'Unidad de medida' es de solo lectura y no puede ser modificado."
+# c2.3 · 400
+HU03_C2_3 = "El campo nombre es obligatorio, por favor, ingrésalo e intenta nuevamente."
+# c2.4 · 400
+HU03_C2_4_A = "El campo nombre debe tener entre 3 y 100 caracteres"
+# c2.4 · 400
+HU03_C2_4_B = "El campo nombre contiene caracteres no permitidos"
+# c2.5 · 400 · marcadores: [valor]
+HU03_C2_5 = "La categoría '[valor]' no es válida. Valores permitidos: Materia Prima, Componentes o Lubricantes"
+# c2.6 · 400
+HU03_C2_6 = "El campo densidad es obligatorio y debe contener un valor numérico positivo de máximo 4 caracteres"
+# c2.7 · 400
+HU03_C2_7 = "El campo pureza es obligatorio y debe estar en una escala de 0 a 100% con máximo 3 caracteres"
+# c2.8 · 400
+HU03_C2_8 = "El campo 'ID' es de solo lectura y no puede ser modificado."
+# c3 · 409 · marcadores: [Nombre]
+HU03_C3 = "El material con el nombre '[Nombre]' ya se encuentra registrado en el catálogo"
+# c5 · 409 · marcadores: [Nombre]
+HU03_C5 = (
+    "Inventario ya tiene registrado un artículo con el nombre '[Nombre]'. Indique un nombre "
+    "diferente para el material"
+)
+# c6 · 503
+HU03_C6 = "Error de comunicación con el módulo Inventario al actualizar el material. Por favor reintente más tarde"
+# c7 · 200 · marcadores: [Nombre]
+HU03_C7 = "Material '[Nombre]' actualizado exitosamente"
+# c8 · 404 · marcadores: [id_material]
+HU03_C8 = "El material solicitado con ID '[id_material]' no fue encontrado en el catálogo"
+# c9 · 409
+HU03_C9 = (
+    "No se pueden modificar materiales en estado INACTIVO. Debe reactivar el material antes "
+    "de editar sus propiedades"
+)
+# c10 · 500
+HU03_C10 = "Error interno al actualizar el material. La transacción fue cancelada"
+
 # CRUD básico de materiales ----------------------------------------------------------------
 # No están en el backlog: son los del CRUD de ejemplo (equivalente al de profesores del dojo).
 # El alta (POST /materiales) ya no es del CRUD: la cubre HU-01 con sus propios mensajes.

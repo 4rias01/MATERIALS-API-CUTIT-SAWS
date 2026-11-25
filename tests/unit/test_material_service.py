@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from app.business.domain import mensajes
-from app.business.services.comandos import DatosMaterial, RegistrarMaterialComando
+from app.business.services.comandos import ActualizarMaterialComando, RegistrarMaterialComando
 from app.business.services.material_service import MaterialService
 from app.core.events import BusEventos
 from app.core.exceptions import ConflictoError, ErrorIntegridadDatos, ErrorInterno, RecursoNoEncontradoError
@@ -58,8 +58,8 @@ def comando(nombre: str = "Acero al carbono") -> RegistrarMaterialComando:
     return RegistrarMaterialComando(nombre=nombre, categoria="Materia Prima", unidad_medida="kg", densidad=Decimal("7.85"), pureza=Decimal("98"))
 
 
-def datos_material(nombre: str = "Acero al carbono") -> DatosMaterial:
-    return DatosMaterial(nombre=nombre, categoria="Materia Prima", unidad_medida="kg", densidad=Decimal("7.85"), pureza=Decimal("98"))
+def datos_material(nombre: str = "Acero al carbono") -> ActualizarMaterialComando:
+    return ActualizarMaterialComando(nombre=nombre, categoria="Materia Prima", densidad=Decimal("7.85"), pureza=Decimal("98"))
 
 
 # ── Registrar (HU-01) ──────────────────────────────────────────────────────────
@@ -142,7 +142,7 @@ async def test_actualizar_material_inexistente_lanza_no_encontrado(
     # Dado que el material NO existe
     repositorio.obtener_por_id.return_value = None
 
-    with pytest.raises(RecursoNoEncontradoError, match="Material con id mat-099 no encontrado"):
+    with pytest.raises(RecursoNoEncontradoError, match="El material solicitado con ID 'mat-099' no fue encontrado en el catálogo"):
         await servicio.actualizar("mat-099", datos_material())
 
     # Si no existe, no se verifica el nombre; solo queda el rechazo en la auditoría
@@ -155,7 +155,7 @@ async def test_actualizar_con_el_nombre_de_otro_material_lanza_conflicto(servici
     repositorio.obtener_por_id.return_value = material
     repositorio.existe_nombre.return_value = True  # otro material ya usa ese nombre
 
-    with pytest.raises(ConflictoError, match="Ya existe un material con el nombre: Cobre"):
+    with pytest.raises(ConflictoError, match="El material con el nombre 'Cobre' ya se encuentra registrado en el catálogo"):
         await servicio.actualizar("mat-001", datos_material("Cobre"))
     # El material conserva su nombre
     assert material.nombre == "Acero al carbono"

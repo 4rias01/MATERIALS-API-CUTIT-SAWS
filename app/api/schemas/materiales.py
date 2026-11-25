@@ -12,7 +12,7 @@ from app.business.domain import mensajes
 from app.business.domain.enums import Categoria, EstadoMaterial, UnidadMedida
 from app.business.domain.errores import Motivo, ValorInvalidoError
 from app.business.domain.value_objects import Densidad, NombreMaterial, Pureza, normalizar_nombre
-from app.business.services.comandos import DatosMaterial, RegistrarMaterialComando
+from app.business.services.comandos import ActualizarMaterialComando, RegistrarMaterialComando
 from app.business.services.material_service import FiltrosMaterial
 
 # ---------------------------------------------------------------------------------------
@@ -103,37 +103,104 @@ class MaterialCrearSolicitud(EsquemaEntrada):
         )
 
 
-class MaterialActualizarSolicitud(EsquemaEntrada):
-    """Cuerpo de PUT /materiales/{id} (CRUD básico; lo reemplazará HU-03).
+# ---------------------------------------------------------------------------------------
+# HU-03 · PUT /materiales/{id}
+# ---------------------------------------------------------------------------------------
 
-    El id va en la ruta y el SKU y el estado no se editan: los campos desconocidos o de
-    solo lectura se rechazan con 400 (OWASP A01/A08, asignación masiva).
+# c2.1, c2.2 y c2.8: los tres campos de solo lectura con mensaje propio.
+_MENSAJES_CAMPO_SOLO_LECTURA: dict[str, str] = {
+    "id":            mensajes.HU03_C2_8,
+    "materialId":    mensajes.HU03_C2_8,
+    "material_id":   mensajes.HU03_C2_8,
+    "idMaterial":    mensajes.HU03_C2_8,
+    "id_material":   mensajes.HU03_C2_8,
+    "sku":           mensajes.HU03_C2_1,
+    "unidadMedida":  mensajes.HU03_C2_2,
+    "unidad_medida": mensajes.HU03_C2_2,
+}
+
+
+class MaterialActualizarSolicitud(EsquemaEntrada):
+    """Cuerpo de PUT /materiales/{id} (HU-03 c1 y c2).
+
+    Solo Nombre, Categoría, Densidad y Pureza son editables. ID, SKU y Unidad de medida
+    son de solo lectura (se rechazan con 400 y mensaje específico, c2.1, c2.2 y c2.8).
+    Los demás campos desconocidos se rechazan con el mensaje genérico de ``EsquemaEntrada``.
     """
 
-    nombre: str = Field(min_length=3, max_length=100, examples=["Acero al carbono 1045"])
-    categoria: Categoria = Field(examples=["Materia Prima"])
-    unidad_medida: UnidadMedida = Field(examples=["kg"])
-    densidad: DecimalEntrada = Field(gt=0, max_digits=8, decimal_places=4, examples=[7.85])
-    pureza: DecimalEntrada = Field(ge=0, le=100, max_digits=5, decimal_places=2, examples=[98])
+    mensajes_error: ClassVar[dict[tuple[str, str], str]] = {
+        ("nombre", "missing"):    mensajes.HU03_C2_3,
+        ("nombre", "*"):          mensajes.HU03_C2_3,   # defensivo
+        ("densidad", "missing"):  mensajes.HU03_C2_6,
+        ("densidad", "*"):        mensajes.HU03_C2_6,
+        ("pureza", "missing"):    mensajes.HU03_C2_7,
+        ("pureza", "*"):          mensajes.HU03_C2_7,
+    }
 
-    @field_validator("nombre", mode="before")
+    nombre: str = Field(
+        description="De 3 a 100 caracteres: letras con o sin tilde, ñ, dígitos, espacios y - . , / ( ) #. "
+        "Se eliminan los espacios al inicio y al final y se reducen a uno los repetidos.",
+        examples=["Acero al carbono 1045"],
+    )
+    categoria: Categoria = Field(examples=["Materia Prima"])
+    densidad: DecimalEntrada = Field(examples=[7.85])
+    pureza: DecimalEntrada = Field(examples=[98])
+
+    @field_validator("nombre")
     @classmethod
-    def _normalizar_nombre(cls, valor: Any) -> Any:
-        """Quita los espacios al inicio y al final y reduce a uno los repetidos."""
-        return " ".join(valor.split()) if isinstance(valor, str) else valor
+    def _validar_nombre(cls, valor: str) -> str:
+        if not normalizar_nombre(valor):
+            raise error_de_negocio(mensajes.HU03_C2_3)
+        try:
+            return NombreMaterial.crear(valor).valor
+        except ValorInvalidoError as exc:
+            mensaje = mensajes.HU03_C2_4_A if exc.motivo == Motivo.LONGITUD else mensajes.HU03_C2_4_B
+            raise error_de_negocio(mensaje) from None
+
+    @field_validator("densidad")
+    @classmethod
+    def _validar_densidad(cls, valor: Decimal) -> Decimal:
+        try:
+            return Densidad(valor).valor
+        except ValorInvalidoError:
+            raise error_de_negocio(mensajes.HU03_C2_6) from None
+
+    @field_validator("pureza")
+    @classmethod
+    def _validar_pureza(cls, valor: Decimal) -> Decimal:
+        try:
+            return Pureza(valor).valor
+        except ValorInvalidoError:
+            raise error_de_negocio(mensajes.HU03_C2_7) from None
 
     @classmethod
     def mensaje_para_error(cls, error: ErrorDetails, datos: Any) -> str | None:
-        """Un mensaje por campo; los campos desconocidos usan el mensaje genérico."""
-        if error["type"] == "extra_forbidden" or not error["loc"]:
-            return None
-        return mensajes.formatear(mensajes.MATERIAL_CAMPO_INVALIDO, campo=error["loc"][0])
+        # Igual que en HU-01: un ``null`` cuenta como "obligatorio".
+        if error["type"] != "missing" and error.get("input", ...) is None:
+            error = error.copy()
+            error["type"] = "missing"
 
-    def a_datos(self) -> DatosMaterial:
-        return DatosMaterial(
+        # c2.1 / c2.2 / c2.8: campos de solo lectura enviados en el cuerpo.
+        if error["type"] == "extra_forbidden":
+            campo = error["loc"][0] if error["loc"] else ""
+            mensaje = _MENSAJES_CAMPO_SOLO_LECTURA.get(campo)
+            if mensaje is not None:
+                return mensaje
+            return super().mensaje_para_error(error, datos)
+
+        # c2.5: formateamos explícitamente ``[valor]`` (cubre "omitido" y "valor inválido").
+        if error["loc"] and error["loc"][0] == "categoria":
+            valor = error.get("input")
+            if valor is None:
+                valor = ""
+            return mensajes.formatear(mensajes.HU03_C2_5, valor=valor)
+
+        return super().mensaje_para_error(error, datos)
+
+    def a_comando(self) -> ActualizarMaterialComando:
+        return ActualizarMaterialComando(
             nombre=self.nombre,
             categoria=self.categoria.value,
-            unidad_medida=self.unidad_medida.value,
             densidad=self.densidad,
             pureza=self.pureza,
         )
@@ -212,6 +279,14 @@ class MaterialRegistradoRespuesta(MaterialRespuesta):
     def con_mensaje(cls, material: Any, mensaje: str) -> Self:
         return cls(**_campos(material), mensaje=mensaje)
 
+class MaterialActualizadoRespuesta(MaterialRespuesta):
+    """Material actualizado y mensaje (HU-03 c7: 200)."""
+
+    mensaje: str = Field(examples=["Material 'Acero al carbono 1045' actualizado exitosamente"])
+
+    @classmethod
+    def con_mensaje(cls, material: Any, mensaje: str) -> Self:
+        return cls(**_campos(material), mensaje=mensaje)
 
 def _campos(material: Any) -> dict[str, Any]:
     return {
