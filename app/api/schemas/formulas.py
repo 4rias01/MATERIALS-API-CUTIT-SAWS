@@ -4,7 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any, Self
 
-from pydantic import Field, ValidationInfo, field_validator
+from pydantic import Field, ValidationInfo, field_validator, model_validator
 from pydantic_core import ErrorDetails
 
 from app.api.schemas.comun import DecimalEntrada, DecimalSalida, EsquemaEntrada, EsquemaSalida, error_de_negocio
@@ -44,6 +44,29 @@ class ComponenteCrearSolicitud(EsquemaEntrada):
             raise error_de_negocio(exc.mensaje) from None
 
 
+def _mensaje_campo_omitido(datos: dict[str, Any]) -> str | None:
+    """Mensaje del primer campo obligatorio omitido (c2), o None si están todos."""
+
+    def omitido(valor: Any) -> bool:
+        return valor is None or (isinstance(valor, str) and not valor.strip())
+
+    if omitido(datos.get("nombre")):
+        return mensajes.HU05_C2_1
+    if omitido(datos.get("aplicacionTecnica")):
+        return mensajes.HU05_C2_2
+    componentes = datos.get("componentes")
+    if componentes is None or (isinstance(componentes, list) and len(componentes) < 2):
+        return mensajes.HU05_C2_3
+    if isinstance(componentes, list):
+        for linea in componentes:
+            # Sin un ID no se puede armar el mensaje 2.4: lo rechaza la validación de la línea.
+            if isinstance(linea, dict) and linea.get("cantidad") is None:
+                material_id = linea.get("materialId")
+                if isinstance(material_id, str) and material_id:
+                    return mensajes.formatear(mensajes.HU05_C2_4, IDMaterial=material_id)
+    return None
+
+
 class FormulaCrearSolicitud(EsquemaEntrada):
     nombre: str = Field(description="Texto alfabético, máximo 80 caracteres.", examples=["Mezcla de corte"])
     aplicacion_tecnica: str = Field(description="Texto alfanumérico, máximo 200 caracteres.", examples=["Corte de acero 1045"])
@@ -52,14 +75,16 @@ class FormulaCrearSolicitud(EsquemaEntrada):
     @classmethod
     def mensaje_para_error(cls, error: ErrorDetails, datos: Any) -> str | None:
         campo = error["loc"][0] if error["loc"] else ""
-        omitido = error["type"] == "missing" or error.get("input", ...) is None
-        if campo == "nombre":
-            return mensajes.HU05_C2_1 if omitido else mensajes.HU05_C9_1_B
-        if campo == "aplicacionTecnica":
-            return mensajes.HU05_C2_2 if omitido else None
-        if campo == "componentes" and omitido:
-            return mensajes.HU05_C2_3
-        return None
+        return mensajes.HU05_C9_1_B if campo == "nombre" else None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _validar_campos_obligatorios(cls, datos: Any) -> Any:
+        """c3 y c9 solo aplican si el registro tiene los campos obligatorios: c2 va primero."""
+        mensaje = _mensaje_campo_omitido(datos) if isinstance(datos, dict) else None
+        if mensaje is not None:
+            raise error_de_negocio(mensaje)
+        return datos
 
     @field_validator("nombre")
     @classmethod
