@@ -302,7 +302,9 @@ alembic check                                 # falla si modelos y migraciones d
 |---|---|
 | Este módulo llama | `POST /inventario/materias-primas` (HU-01 c4) |
 | Configuración | `INVENTARIO_URL`, `INVENTARIO_RUTA_MATERIAS_PRIMAS` |
-| Contrato por acordar | Nombres de los campos JSON y código HTTP del nombre repetido: constantes en `app/infraestructure/clients/inventario_client.py` |
+| URL base | `INVENTARIO_URL=http://<ip>:<puerto>`, sin ruta: `/actuator/health` no va en la variable |
+| Contrato del alta | Publicado en `/v3/api-docs` de Inventario: el SKU se lee de `articulo.codigo` |
+| Por acordar | Código HTTP y cuerpo del nombre repetido, y `PATCH /inventario/articulos/{codigo}` (HU-03 c4), que Inventario aún no publica |
 
 Patent Sweep aún no tiene cliente: se crea con HU-09 (su URL ya se configura con `PATENT_SWEEP_URL`).
 

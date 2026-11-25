@@ -153,6 +153,42 @@ async def test_c02_c03_cantidad_invalida(cliente: httpx.AsyncClient, escenario: 
     assert escenario.formulas.formulas == {}
 
 
+@pytest.mark.parametrize(
+    "cambios,mensaje",
+    [
+        ({"nombre": "Mezcla 1", "aplicacionTecnica": ...}, mensajes.HU05_C2_2),
+        ({"nombre": "Mezcla 1", "componentes": ...}, mensajes.HU05_C2_3),
+        ({"nombre": 123, "componentes": []}, mensajes.HU05_C2_3),
+        ({"aplicacionTecnica": "A" * 201, "componentes": None}, mensajes.HU05_C2_3),
+        ({"componentes": [{"materialId": "mat-001", "cantidad": 0}]}, mensajes.HU05_C2_3),
+        (
+            {"nombre": "Mezcla 1", "componentes": [{"materialId": "mat-001"}, {"materialId": "mat-002", "cantidad": 1}]},
+            formatear(mensajes.HU05_C2_4, IDMaterial="mat-001"),
+        ),
+        (
+            {"componentes": [{"materialId": "mat-001", "cantidad": 0}, {"materialId": "mat-002", "cantidad": None}]},
+            formatear(mensajes.HU05_C2_4, IDMaterial="mat-002"),
+        ),
+        (
+            {"componentes": [{"materialId": "mat-001", "cantidad": 1, "unidadMedida": "kg"}, {"materialId": "mat-002"}]},
+            formatear(mensajes.HU05_C2_4, IDMaterial="mat-002"),
+        ),
+    ],
+)
+async def test_c02_los_campos_omitidos_se_reportan_antes_que_c03_y_c09(
+    cliente: httpx.AsyncClient, escenario: Escenario, cambios: dict[str, Any], mensaje: str
+) -> None:
+    """c3 y c9 aplican cuando "el registro tiene los campos obligatorios"."""
+    r = await cliente.post("/formulas", json=_cuerpo(**cambios))
+    assert (r.status_code, r.json()["mensaje"]) == (400, mensaje)
+    assert escenario.formulas.formulas == {} and escenario.uow.confirmaciones == 0
+
+
+@pytest.mark.parametrize("cuerpo", [[], "texto", 1, None])
+async def test_c02_cuerpo_que_no_es_objeto_responde_400(cliente: httpx.AsyncClient, escenario: Escenario, cuerpo: Any) -> None:
+    assert (await cliente.post("/formulas", json=cuerpo)).status_code == 400
+
+
 @pytest.mark.parametrize("valor", [0.001, 999999.999, "2.0000", "1e-3"])
 async def test_c01_c03_limites_de_cantidad_validos(cliente: httpx.AsyncClient, escenario: Escenario, valor: Any) -> None:
     cuerpo = _cuerpo()
