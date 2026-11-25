@@ -182,7 +182,7 @@ class MaterialActualizarSolicitud(EsquemaEntrada):
         # c2.1 / c2.2 / c2.8: campos de solo lectura enviados en el cuerpo.
         if error["type"] == "extra_forbidden":
             campo = error["loc"][0] if error["loc"] else ""
-            mensaje = _MENSAJES_CAMPO_SOLO_LECTURA.get(campo)
+            mensaje = _MENSAJES_CAMPO_SOLO_LECTURA.get(campo) if isinstance(campo, str) else None
             if mensaje is not None:
                 return mensaje
             return super().mensaje_para_error(error, datos)
