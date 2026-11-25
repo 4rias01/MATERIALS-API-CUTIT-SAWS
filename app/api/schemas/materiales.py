@@ -7,14 +7,12 @@ from typing import Any, ClassVar, Self
 from pydantic import Field, field_validator
 from pydantic_core import ErrorDetails
 
-
 from app.api.schemas.comun import DecimalEntrada, DecimalSalida, EsquemaEntrada, EsquemaSalida, error_de_negocio
 from app.business.domain import mensajes
 from app.business.domain.enums import Categoria, EstadoMaterial, UnidadMedida
 from app.business.domain.errores import Motivo, ValorInvalidoError
 from app.business.domain.value_objects import Densidad, NombreMaterial, Pureza, normalizar_nombre
-from app.business.services.comandos import DatosMaterial, RegistrarMaterialComando, ActualizarMaterialComando
-
+from app.business.services.comandos import ActualizarMaterialComando, RegistrarMaterialComando
 # ---------------------------------------------------------------------------------------
 # Entrada
 # ---------------------------------------------------------------------------------------

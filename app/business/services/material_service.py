@@ -22,7 +22,7 @@ from app.business.domain.mensajes import formatear
 from app.business.domain.value_objects import Sku, normalizar_nombre
 from app.business.domain.value_objects import id_material as nuevo_id_material
 from app.business.services.base import Resultado, ServicioBase, ahora, operacion_de_negocio
-from app.business.services.comandos import DatosMaterial, RegistrarMaterialComando, ActualizarMaterialComando
+from app.business.services.comandos import ActualizarMaterialComando, RegistrarMaterialComando
 from app.core.events import BusEventos
 from app.core.exceptions import (
     ConflictoError,
