@@ -55,6 +55,9 @@ class Configuracion(BaseSettings):
     inventario_url: str | None = None
     # Ruta definida en el backlog (HU-01 c4).
     inventario_ruta_materias_primas: str = "/inventario/materias-primas"
+    # Ruta base definida en el backlog para HU-03 c4 (PATCH /inventario/articulos/{codigo}).
+    # El cliente agrega ``/{codigo}`` al construir la URL.
+    inventario_ruta_articulos: str = "/inventario/articulos"
     # Aún sin uso: se configura desde ya para el despliegue.
     patent_sweep_url: str | None = None
     # Circuit Breaker de cada cliente: fallos seguidos para abrir y segundos que permanece abierto.
