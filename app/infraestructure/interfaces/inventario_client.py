@@ -24,3 +24,12 @@ class IInventarioClient(IClienteExterno):
     async def registrar_materia_prima(self, nombre: str, unidad_medida: str) -> str:
         """Registra el material como materia prima y devuelve el Código de artículo
         (SKU, formato MP-00000) que asigna Inventario (HU-01 c4)."""
+
+    @abstractmethod
+    async def actualizar_articulo(self, codigo: str, nombre: str) -> None:
+        """Modifica el Nombre del artículo ``codigo`` (SKU) en Inventario (HU-03 c4).
+
+        Lanza ``NombreDuplicadoEnInventarioError`` si Inventario rechaza el nombre por
+        duplicado (HU-03 c5). Los fallos de comunicación se propagan como
+        ``app.core.exceptions.ErrorServicioExterno`` (503, HU-03 c6).
+        """
