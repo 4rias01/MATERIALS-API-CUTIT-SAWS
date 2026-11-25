@@ -7,13 +7,21 @@ from typing import Any, ClassVar, Self
 from pydantic import AliasChoices, Field, field_validator
 from pydantic_core import ErrorDetails
 
-from app.api.schemas.comun import DecimalEntrada, DecimalSalida, EsquemaEntrada, EsquemaSalida, error_de_negocio
+from app.api.schemas.comun import (
+    DecimalEntrada,
+    DecimalSalida,
+    EsquemaEntrada,
+    EsquemaSalida,
+    error_de_negocio,
+)
 from app.business.domain import mensajes
 from app.business.domain.enums import Categoria, EstadoMaterial, UnidadMedida
 from app.business.domain.errores import Motivo, ValorInvalidoError
 from app.business.domain.value_objects import Densidad, NombreMaterial, Pureza, normalizar_nombre
 from app.business.services.comandos import ActualizarMaterialComando, RegistrarMaterialComando
 from app.business.services.material_service import FiltrosMaterial
+
+
 # ---------------------------------------------------------------------------------------
 # Entrada
 # ---------------------------------------------------------------------------------------
@@ -278,6 +286,7 @@ class MaterialRegistradoRespuesta(MaterialRespuesta):
     def con_mensaje(cls, material: Any, mensaje: str) -> Self:
         return cls(**_campos(material), mensaje=mensaje)
 
+
 class MaterialActualizadoRespuesta(MaterialRespuesta):
     """Material actualizado y mensaje (HU-03 c7: 200)."""
 
@@ -286,6 +295,7 @@ class MaterialActualizadoRespuesta(MaterialRespuesta):
     @classmethod
     def con_mensaje(cls, material: Any, mensaje: str) -> Self:
         return cls(**_campos(material), mensaje=mensaje)
+
 
 def _campos(material: Any) -> dict[str, Any]:
     return {

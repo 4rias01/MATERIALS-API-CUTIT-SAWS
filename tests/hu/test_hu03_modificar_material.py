@@ -211,3 +211,5 @@ async def test_c10_bd_falla_responde_500_y_loguea_el_sku(
     assert r.status_code == 500
     assert mensajes.HU03_C10 in r.text
     assert "MP-00001" in caplog.text          # SKU en el log para reconciliar con Inventario
+
+    
