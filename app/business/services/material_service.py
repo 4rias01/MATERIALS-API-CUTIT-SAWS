@@ -3,9 +3,8 @@
 * HU-01 (registrar material): POST /materiales. Recorre las tres capas (router →
   servicio → repositorio y cliente de Inventario) y sirve de modelo para las siguientes
   historias de usuario.
-* CRUD básico (equivalente al ``ProfesorService`` del dojo de Java): actualizar,
-  eliminar, listar, obtener por id y buscar por nombre. Las HU-02 a HU-04 los
-  reemplazarán con sus propios criterios.
+* HU-02 y HU-03: consultar la ficha técnica, listar y modificar materiales activos.
+* CRUD básico: eliminar y buscar por nombre.
 
 Cada método usa la infraestructura del arquetipo: unidad de trabajo, auditoría de las
 escrituras y eventos de dominio.
@@ -22,7 +21,7 @@ from app.business.domain.mensajes import formatear
 from app.business.domain.value_objects import Sku, normalizar_nombre
 from app.business.domain.value_objects import id_material as nuevo_id_material
 from app.business.services.base import Resultado, ServicioBase, ahora, operacion_de_negocio
-from app.business.services.comandos import DatosMaterial, RegistrarMaterialComando
+from app.business.services.comandos import ActualizarMaterialComando, RegistrarMaterialComando
 from app.core.events import BusEventos
 from app.core.exceptions import (
     ConflictoError,
@@ -38,13 +37,16 @@ from app.infraestructure.interfaces import (
     IUnitOfWork,
     NombreDuplicadoEnInventarioError,
 )
+from app.infraestructure.interfaces.material_repository import FiltrosMaterial
 from app.infraestructure.models import Material
 from app.infraestructure.models.material import RESTRICCION_NOMBRE_UNICO
 
 logger = logging.getLogger(__name__)
 
+TAMANO_PAGINA = 10
 RECURSO = "material"
 OPERACION_REGISTRAR = "REGISTRAR_MATERIAL"
+OPERACION_ACTUALIZAR = "ACTUALIZAR_MATERIAL"
 SERVICIO_INVENTARIO = "inventario"
 ERROR_BD = mensajes.MATERIAL_ERROR_BASE_DATOS
 
@@ -142,33 +144,58 @@ class MaterialService(ServicioBase):
             raise
         return material
 
-    # --- CRUD básico: escrituras (se auditan) ----------------------------------------
+    # --- HU-03 · Modificar material --------------------------------------------------
 
-    @operacion_de_negocio("ACTUALIZAR_MATERIAL", RECURSO, mensaje_error_bd=ERROR_BD, parametro_id="id_material")
-    async def actualizar(self, id_material: str, datos: DatosMaterial) -> Resultado[Material]:
-        """PUT /materiales/{id} → 200. 404 si no existe; 409 si el nombre lo usa otro material."""
+    @operacion_de_negocio(
+        OPERACION_ACTUALIZAR,
+        RECURSO,
+        mensaje_error_bd=mensajes.HU03_C10,
+        mensaje_servicio_externo=mensajes.HU03_C6,
+        parametro_id="id_material",
+    )
+    async def actualizar(self, id_material: str, comando: ActualizarMaterialComando) -> Resultado[Material]:
+        """HU-03 · PUT /materiales/{id} → 200 con el material actualizado y ``HU03_C7``."""
+        nombre = normalizar_nombre(comando.nombre)
+        sku_sincronizado = None
         try:
             async with self._uow:
-                material = await self._obtener_o_404(id_material)
-                if await self._materiales.existe_nombre(datos.nombre, excluir_id=id_material):
-                    raise _nombre_duplicado(datos.nombre)
-                material.nombre = datos.nombre
-                material.categoria = datos.categoria
-                material.unidad_medida = datos.unidad_medida
-                material.densidad = datos.densidad
-                material.pureza = datos.pureza
+                material = await self._materiales.obtener_por_id(id_material, para_actualizar=True)
+                if material is None:
+                    raise RecursoNoEncontradoError(formatear(mensajes.HU03_C8, id_material=id_material))
+                if material.estado != EstadoMaterial.ACTIVO.value:
+                    raise ConflictoError(mensajes.HU03_C9)
+                if material.nombre != nombre:
+                    if await self._materiales.existe_nombre(nombre, excluir_id=id_material):
+                        raise _nombre_duplicado_hu03(nombre)
+                    await self._actualizar_en_inventario(material.sku, nombre)
+                    sku_sincronizado = material.sku
+                    material.nombre = nombre
+                material.categoria = comando.categoria
+                material.densidad = comando.densidad
+                material.pureza = comando.pureza
                 material.fecha_actualizacion = ahora()
-                self._auditar("ACTUALIZAR_MATERIAL", RECURSO, id_material, 200)
+                self._auditar(OPERACION_ACTUALIZAR, RECURSO, id_material, 200, {"sku": material.sku})
                 await self._uow.commit()
-        except ErrorIntegridadDatos as exc:
-            # Otra petición guardó el mismo nombre entre la verificación y el commit: el
-            # índice único lo rechaza y se responde 409 como en la verificación. Cualquier
-            # otra violación es un fallo de base de datos (500).
-            if exc.restriccion != RESTRICCION_NOMBRE_UNICO:
-                raise
-            raise _nombre_duplicado(datos.nombre) from exc
+        except ErrorBaseDatos as exc:
+            if sku_sincronizado is not None:
+                _registrar_fallo_al_actualizar(sku_sincronizado, nombre)
+            if isinstance(exc, ErrorIntegridadDatos) and exc.restriccion == RESTRICCION_NOMBRE_UNICO:
+                raise _nombre_duplicado_hu03(nombre) from exc
+            raise
+
         self._publicar(TipoEvento.MATERIAL_ACTUALIZADO, materialId=id_material)
-        return Resultado(material)
+        return Resultado(material, formatear(mensajes.HU03_C7, Nombre=nombre))
+
+    async def _actualizar_en_inventario(self, sku: str, nombre: str) -> None:
+        """c4: PATCH /inventario/articulos/{sku} con el nuevo Nombre.
+
+        c5 (nombre duplicado en Inventario) se traduce a ConflictoError; los fallos técnicos
+        los traduce el decorador a 503 con ``HU03_C6`` (c6).
+        """
+        try:
+            await self._inventario.actualizar_articulo(sku, nombre)
+        except NombreDuplicadoEnInventarioError as exc:
+            raise ConflictoError(formatear(mensajes.HU03_C5, Nombre=nombre)) from exc
 
     @operacion_de_negocio("ELIMINAR_MATERIAL", RECURSO, mensaje_error_bd=ERROR_BD, parametro_id="id_material")
     async def eliminar(self, id_material: str) -> None:
@@ -182,17 +209,25 @@ class MaterialService(ServicioBase):
 
     # --- CRUD básico: consultas (no se auditan) --------------------------------------
 
+    @operacion_de_negocio("LISTAR_MATERIALES", RECURSO, mensaje_error_bd=mensajes.HU02_C5, auditar=False)
+    async def listar(self, filtros: FiltrosMaterial, pagina: int) -> tuple[list[Material], int]:
+        async with self._uow:
+            return await self._materiales.listar_pagina(filtros, (pagina - 1) * TAMANO_PAGINA, TAMANO_PAGINA)
+
     @operacion_de_negocio("LISTAR_MATERIALES", RECURSO, mensaje_error_bd=ERROR_BD, auditar=False)
     async def obtener_todos(self) -> Resultado[Sequence[Material]]:
         """GET /materiales → 200."""
         async with self._uow:
             return Resultado(await self._materiales.listar())
 
-    @operacion_de_negocio("CONSULTAR_MATERIAL", RECURSO, mensaje_error_bd=ERROR_BD, auditar=False)
+    @operacion_de_negocio("CONSULTAR_MATERIAL", RECURSO, mensaje_error_bd=mensajes.HU02_C5, auditar=False)
     async def obtener_por_id(self, id_material: str) -> Resultado[Material]:
         """GET /materiales/{id} → 200. 404 si no existe."""
         async with self._uow:
-            return Resultado(await self._obtener_o_404(id_material))
+            material = await self._materiales.obtener_por_id(id_material)
+            if material is None:
+                raise RecursoNoEncontradoError(formatear(mensajes.HU02_C4, IDIngresado=id_material))
+            return Resultado(material)
 
     @operacion_de_negocio("BUSCAR_MATERIALES", RECURSO, mensaje_error_bd=ERROR_BD, auditar=False)
     async def buscar_por_nombre(self, nombre: str) -> Resultado[Sequence[Material]]:
@@ -214,9 +249,20 @@ def _nombre_ya_registrado(nombre: str) -> ConflictoError:
     return ConflictoError(formatear(mensajes.HU01_C3, Nombre=nombre))
 
 
-def _nombre_duplicado(nombre: str) -> ConflictoError:
-    """CRUD básico (PUT)."""
-    return ConflictoError(formatear(mensajes.MATERIAL_NOMBRE_DUPLICADO, nombre=nombre))
+def _nombre_duplicado_hu03(nombre: str) -> ConflictoError:
+    """HU-03 c3."""
+    return ConflictoError(formatear(mensajes.HU03_C3, Nombre=nombre))
+
+
+def _registrar_fallo_al_actualizar(sku: str, nombre: str) -> None:
+    # c10: el SKU y el nuevo nombre quedan en el log para reconciliar con Inventario
+    # (Inventario ya tiene el nombre nuevo pero Materiales no lo persistió).
+    logger.error(
+        "No se pudo actualizar el material; Inventario ya tiene el nombre %r para el SKU %s",
+        nombre,
+        sku,
+        extra={"sku": sku, "nombre": nombre},
+    )
 
 
 def _registrar_fallo_al_guardar(sku: str, nombre: str) -> None:

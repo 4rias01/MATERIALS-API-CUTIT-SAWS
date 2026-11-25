@@ -79,9 +79,7 @@ def _sin_persistir(escenario: Escenario) -> None:
 # ---------------------------------------------------------------------------------------
 
 
-async def test_c01_normaliza_los_espacios_del_nombre_antes_de_validar_y_guardar(
-    cliente: httpx.AsyncClient, escenario: Escenario
-) -> None:
+async def test_c01_normaliza_los_espacios_del_nombre_antes_de_validar_y_guardar(cliente: httpx.AsyncClient, escenario: Escenario) -> None:
     r = await cliente.post("/materiales", json=_cuerpo(nombre="   Acero   al  carbono 1045  "))
     assert r.status_code == 201
     assert r.json()["nombre"] == "Acero al carbono 1045"
@@ -186,9 +184,7 @@ async def test_c02_rechaza_campos_de_solo_lectura(cliente: httpx.AsyncClient, es
 # ---------------------------------------------------------------------------------------
 
 
-async def test_c03_responde_409_si_el_nombre_ya_existe_sin_distinguir_mayusculas(
-    cliente: httpx.AsyncClient, escenario: Escenario
-) -> None:
+async def test_c03_responde_409_si_el_nombre_ya_existe_sin_distinguir_mayusculas(cliente: httpx.AsyncClient, escenario: Escenario) -> None:
     escenario.materiales.sembrar(un_material(1, nombre="Ácido Cítrico"))
     r = await cliente.post("/materiales", json=_cuerpo(nombre="  ÁCIDO   cítrico "))
     assert r.status_code == 409
@@ -290,9 +286,7 @@ async def test_c07_responde_201_con_el_material_creado(cliente: httpx.AsyncClien
     assert [(a.operacion, a.recurso_id, a.resultado_http, a.detalle) for a in escenario.auditoria.registros] == [
         ("REGISTRAR_MATERIAL", "mat-001", 201, {"sku": "MP-00042"})
     ]
-    assert [(e.nombre, dict(e.datos)) for e in escenario.eventos] == [
-        ("MaterialRegistrado", {"materialId": "mat-001", "sku": "MP-00042"})
-    ]
+    assert [(e.nombre, dict(e.datos)) for e in escenario.eventos] == [("MaterialRegistrado", {"materialId": "mat-001", "sku": "MP-00042"})]
 
 
 async def test_c07_el_id_es_secuencial(cliente: httpx.AsyncClient, escenario: Escenario) -> None:

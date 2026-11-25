@@ -3,16 +3,17 @@
 API REST de la célula 1 de la plataforma backend de Cutit Saws (Desarrollo de Software II, 2026-2).
 Implementa el **DAS v1.2** del módulo y el **product backlog V1.3**.
 
-> **Estado: arquetipo + HU-01 (registrar material) + CRUD básico de materiales.** La
-> infraestructura transversal funciona, **HU-01 está implementada de punta a punta** (es el
-> ejemplo de referencia para las demás historias, sección 4) y el resto de `/materiales`
-> (consultar, actualizar y eliminar) es el CRUD básico del dojo, que reemplazarán HU-02 a HU-04.
+El catálogo permite registrar materiales en Inventario (HU-01), consultar su ficha técnica
+y filtrar el listado en páginas de 10 materiales (HU-02). La HU-03 permite modificar las
+propiedades de un material activo y sincroniza los cambios de nombre con Inventario.
+La HU-05 registra fórmulas en estado BORRADOR. El CRUD básico conserva la búsqueda por nombre y la eliminación.
 
 | Funciona hoy | Pendiente |
 |---|---|
-| Arquitectura en capas, inyección de dependencias, configuración por variables de entorno | HU-02 a HU-11 (rutas, DTO, servicios, tablas, clientes y pruebas) |
+| Arquitectura en capas, inyección de dependencias, configuración por variables de entorno | HU-04 y HU-06 a HU-11 (rutas, DTO, servicios, tablas, clientes y pruebas) |
+| HU-05: `POST /formulas`, validación de componentes activos, registro en BORRADOR y ficha técnica | |
 | HU-01 completa: DTO con los mensajes del criterio 2, servicio, repositorio y alta en Inventario | Contrato POR ACORDAR con Inventario y Patent Sweep (sección 11) |
-| CRUD básico de materiales: listar, buscar por id o por nombre, actualizar y eliminar | |
+| HU-03, modificación de materiales activos. CRUD básico de búsqueda por nombre y eliminación | |
 | Modelos ORM y migraciones Alembic de `auditoria` y `material` | |
 | Unidad de trabajo (commit/rollback, timeout de 5 s), auditoría, eventos de dominio | |
 | Cliente HTTP base (timeout de 5 s, circuit breaker, traceId) y cliente de Inventario | |
@@ -106,16 +107,19 @@ y Prometheus y Grafana únicamente en `127.0.0.1`. En desarrollo PostgreSQL se p
 | Método y ruta | Origen | Respuesta |
 |---|---|---|
 | `POST /materiales` | **HU-01** | 201 con el material y el mensaje de c7 · 400 (mensaje de c2) · 409 nombre repetido en el catálogo (c3) o en Inventario (c5) · 503 Inventario no disponible (c6) · 500 base de datos (c8) |
-| `GET /materiales` | CRUD | 200 con la lista |
+| `GET /materiales` | HU-02 | 200 con página, totales y materiales; filtros opcionales por nombre, categoría, unidad y estado |
 | `GET /materiales/buscar?nombre=` | CRUD | 200 con los que contienen el texto (sin distinguir mayúsculas) |
-| `GET /materiales/{id}` | CRUD | 200 · 400 id sin formato `mat-NNN` · 404 si no existe |
-| `PUT /materiales/{id}` | CRUD | 200 con el material actualizado · 404 · 409 nombre de otro material |
+| `GET /materiales/{id}` | HU-02 | 200 con la ficha técnica de nueve campos · 404 si el ID no existe |
+| `PUT /materiales/{id}` | HU-03 | 200 con el material actualizado y el mensaje · 400 datos inválidos · 404 ID inexistente · 409 material inactivo o nombre duplicado · 503 fallo de Inventario · 500 fallo de base de datos |
 | `DELETE /materiales/{id}` | CRUD | 204 · 404 |
 
-Cuerpo de POST y PUT: `{"nombre", "categoria", "unidadMedida", "densidad", "pureza"}`. El ID
-(`mat-NNN`), el SKU (lo asigna Inventario) y el estado (`ACTIVO` al registrar) son de solo
-lectura: cualquier campo extra se rechaza con 400. El material se devuelve con `materialId`,
-`sku`, los cinco campos, `estado`, `fechaRegistro` y `fechaUltimaActualizacion`.
+El POST recibe `nombre`, `categoria`, `unidadMedida`, `densidad` y `pureza`. Para editar,
+consulta los valores actuales con `GET /materiales/{id}` y envía los cuatro campos obligatorios
+`nombre`, `categoria`, `densidad` y `pureza` en el PUT. El ID, el SKU y la unidad de medida
+son de solo lectura durante la edición. El material se identifica en la ruta, por ejemplo
+`PUT /materiales/mat-001`. Enviar `ID` en el cuerpo devuelve 400 con el mensaje del criterio 2.8.
+Un cambio de nombre, incluso solo de mayúsculas,
+requiere confirmación de `PATCH /inventario/articulos/{codigo}`, donde `codigo` es el SKU.
 
 Ejemplo de HU-01 (Inventario debe estar configurado en `INVENTARIO_URL`; si no, responde 503):
 
@@ -124,6 +128,41 @@ curl -s -X POST localhost:$API_PUERTO_HOST/materiales -H 'Content-Type: applicat
   -d '{"nombre": "Acero al carbono 1045", "categoria": "Materia Prima", "unidadMedida": "kg", "densidad": 7.85, "pureza": 98}'
 # 201 {"materialId": "mat-001", "sku": "MP-00001", ..., "estado": "ACTIVO",
 #      "mensaje": "Material 'Acero al carbono 1045' registrado exitosamente con el SKU MP-00001."}
+```
+
+### Fórmulas (HU-05)
+
+`POST /formulas` recibe `nombre` (letras y espacios, máximo 80 caracteres),
+`aplicacionTecnica` (alfanumérico, máximo 200) y `componentes`, con mínimo dos materiales
+distintos. Cada componente recibe únicamente `materialId` y `cantidad` (> 0, máximo seis
+dígitos enteros y tres decimales; entera si el material usa `und`). La unidad se toma del
+catálogo. No consulta, reserva ni descuenta existencias, ni llama a Inventario.
+
+```json
+{
+  "nombre": "Mezcla de corte",
+  "aplicacionTecnica": "Corte de acero 1045",
+  "componentes": [
+    {"materialId": "mat-001", "cantidad": 2.125},
+    {"materialId": "mat-002", "cantidad": 3}
+  ]
+}
+```
+
+Responde **201** con `formulaId` (`form-NNN` secuencial), nombre, aplicación técnica,
+versión 1, estado BORRADOR, fechas UTC iguales, componentes (SKU, nombre, cantidad y unidad)
+y el mensaje del backlog. Los errores responden **400** por contrato inválido,
+**422** por materiales inexistentes/inactivos o cantidad fraccionaria para `und`,
+**409** por nombre repetido sin distinguir mayúsculas y **500** por fallo de BD,
+con rollback y traceId. Fórmula, componentes y auditoría se guardan en una sola transacción.
+
+La migración `0004` agrega `formula`, `formula_componente` y `seq_formula`, sin modificar
+los datos de materiales. El downgrade elimina únicamente las tablas y secuencia de HU-05.
+No se implementan consultas, edición, descontinuación ni evaluación de patentes.
+
+```bash
+pytest tests/hu/test_hu05_registrar_formula.py
+pytest tests/integration/test_formula_api.py  # requiere TEST_DATABASE_URL
 ```
 
 ### API en Python, base de datos en Docker (para desarrollar)
@@ -201,10 +240,9 @@ El manejador global responde 400 con ese texto y el traceId.
 
 ```python
 class MaterialService(ServicioBase):
-    @operacion_de_negocio("REGISTRAR_MATERIAL", "material", mensaje_error_bd=mensajes.HU01_C8,
-                          mensaje_servicio_externo=mensajes.HU01_C6)
+    @operacion_de_negocio("REGISTRAR_MATERIAL", "material", mensaje_error_bd=mensajes.HU01_C8, mensaje_servicio_externo=mensajes.HU01_C6)
     async def registrar(self, comando: RegistrarMaterialComando) -> Resultado[Material]:
-        async with self._uow:                                   # Unit of Work: una transacción
+        async with self._uow:  # Unit of Work: una transacción
             if await self._materiales.existe_nombre(comando.nombre):
                 raise ConflictoError(formatear(mensajes.HU01_C3, Nombre=comando.nombre))
         ...

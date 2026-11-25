@@ -26,7 +26,9 @@ class ServicioDePrueba(ServicioBase):
         super().__init__(self.uow, self.auditoria, bus)
         self.error = error
 
-    @operacion_de_negocio("OPERAR", "prueba", mensaje_error_bd="Fallo BD [traceId]", mensaje_servicio_externo="Otra célula caída", parametro_id="id_recurso")
+    @operacion_de_negocio(
+        "OPERAR", "prueba", mensaje_error_bd="Fallo BD [traceId]", mensaje_servicio_externo="Otra célula caída", parametro_id="id_recurso"
+    )
     async def operar(self, id_recurso: str) -> Resultado[str]:
         if self.error:
             raise self.error

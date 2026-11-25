@@ -81,9 +81,7 @@ class ClienteHttpBase(IClienteExterno):
 
         if respuesta.status_code >= 500:
             self._fallo(str(respuesta.status_code), metodo, url)
-            raise ErrorServicioExterno(
-                self._servicio, ErrorServicioExterno.ERROR_INTERNO, estado_recibido=respuesta.status_code
-            )
+            raise ErrorServicioExterno(self._servicio, ErrorServicioExterno.ERROR_INTERNO, estado_recibido=respuesta.status_code)
         self._circuito.registrar_exito()
         self._contar(str(respuesta.status_code))
         return respuesta
@@ -110,9 +108,7 @@ class ClienteHttpBase(IClienteExterno):
             respuesta.status_code,
             extra={"servicio": self._servicio, "cuerpo": respuesta.text[:500]},
         )
-        return ErrorServicioExterno(
-            self._servicio, ErrorServicioExterno.RESPUESTA_INESPERADA, estado_recibido=respuesta.status_code
-        )
+        return ErrorServicioExterno(self._servicio, ErrorServicioExterno.RESPUESTA_INESPERADA, estado_recibido=respuesta.status_code)
 
     @staticmethod
     def _json(respuesta: httpx.Response) -> dict[str, Any]:

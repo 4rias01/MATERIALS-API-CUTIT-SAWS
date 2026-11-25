@@ -55,6 +55,9 @@ class Configuracion(BaseSettings):
     inventario_url: str | None = None
     # Ruta definida en el backlog (HU-01 c4).
     inventario_ruta_materias_primas: str = "/inventario/materias-primas"
+    # Ruta base definida en el backlog para HU-03 c4 (PATCH /inventario/articulos/{codigo}).
+    # El cliente agrega ``/{codigo}`` al construir la URL.
+    inventario_ruta_articulos: str = "/inventario/articulos"
     # Aún sin uso: se configura desde ya para el despliegue.
     patent_sweep_url: str | None = None
     # Circuit Breaker de cada cliente: fallos seguidos para abrir y segundos que permanece abierto.
@@ -70,9 +73,7 @@ class Configuracion(BaseSettings):
             raise ValueError("Defina POSTGRES_USER y POSTGRES_PASSWORD (o DATABASE_URL) en el entorno")
         usuario = quote(self.postgres_user, safe="")
         clave = quote(self.postgres_password.get_secret_value(), safe="")
-        return (
-            f"postgresql+asyncpg://{usuario}:{clave}@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
-        )
+        return f"postgresql+asyncpg://{usuario}:{clave}@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
 
 
 @lru_cache

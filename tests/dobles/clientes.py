@@ -21,6 +21,7 @@ class InventarioClientFalso(IInventarioClient):
     """
 
     def __init__(self, sku: str = "MP-00001", nombre_duplicado: bool = False, caido: bool = False) -> None:
+        self.actualizaciones: list[tuple[str, str]] = []
         self.sku = sku
         self.nombre_duplicado = nombre_duplicado
         self.caido = caido
@@ -33,6 +34,13 @@ class InventarioClientFalso(IInventarioClient):
             raise NombreDuplicadoEnInventarioError(f"Ya existe un artículo con el nombre {nombre}")
         self.altas.append((nombre, unidad_medida))
         return self.sku
+
+    async def actualizar_articulo(self, codigo: str, nombre: str) -> None:
+        if self.caido:
+            raise ErrorServicioExterno("inventario", ErrorServicioExterno.TIMEOUT)
+        if self.nombre_duplicado:
+            raise NombreDuplicadoEnInventarioError()
+        self.actualizaciones.append((codigo, nombre))
 
     def estado_circuito(self) -> str:
         return "ABIERTO" if self.caido else "CERRADO"

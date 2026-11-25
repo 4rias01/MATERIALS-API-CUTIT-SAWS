@@ -49,10 +49,7 @@ HU01_C3 = "El material con el nombre '[Nombre]' ya se encuentra registrado en el
 # c5 · texto que responde Inventario (no lo devuelve esta API) · marcadores: [Nombre]
 HU01_C5_RESPUESTA_INVENTARIO = "Ya existe un artículo con el nombre [Nombre]"
 # c5 · 409 · marcadores: [Nombre]
-HU01_C5 = (
-    "Inventario ya tiene registrado un artículo con el nombre '[Nombre]'. Indique un nombre "
-    "diferente para el material."
-)
+HU01_C5 = "Inventario ya tiene registrado un artículo con el nombre '[Nombre]'. Indique un nombre diferente para el material."
 # c6 · 503
 HU01_C6 = "Error de comunicación con el módulo Inventario al registrar el material. Por favor reintente más tarde"
 # c7 · 201 · marcadores: [Nombre], [SKU]
@@ -60,6 +57,70 @@ HU01_C7 = "Material '[Nombre]' registrado exitosamente con el SKU [SKU]."
 # c8 · 500
 HU01_C8 = "Error interno de conexión con la base de datos. Por favor reintente más tarde"
 
+
+# HU-02 · Consultar materiales
+HU02_C3 = "El valor del filtro de búsqueda '[NombreParametro]' es inválido. Por favor verifique los valores o tipos de datos ingresados."
+HU02_C4 = "El material solicitado con ID '[IDIngresado]' no fue encontrado en el catálogo"
+HU02_C5 = "Error de comunicación con la base de datos al consultar el material. TraceID: [traceId]"
+HU02_C7 = "No se encontraron materiales que coincidan con los criterios indicados"
+
+
+# HU-05 · Registrar fórmula --------------------------------------------------------------
+HU05_C2_1 = "El campo 'Nombre' es obligatorio. Por favor, ingréselo e intente nuevamente."
+HU05_C2_2 = "El campo 'Aplicación técnica' es obligatorio. Por favor, ingréselo e intente nuevamente."
+HU05_C2_3 = "La fórmula debe estar compuesta por mínimo 2 materiales diferentes. Por favor, agregue los componentes e intente nuevamente."
+HU05_C2_4 = "El campo 'Cantidad' del material '[IDMaterial]' es obligatorio. Por favor, ingréselo e intente nuevamente."
+HU05_C3_1 = "La cantidad del material '[IDMaterial]' debe ser un número mayor que 0. Valor recibido: [Cantidad]."
+HU05_C3_2 = "La cantidad del material '[IDMaterial]' admite máximo 6 dígitos enteros y 3 decimales. Valor recibido: [Cantidad]."
+HU05_C4_1 = "La fórmula no puede registrarse. Los siguientes componentes no existen: [Lista de Materiales]."
+HU05_C4_2 = "La fórmula no puede registrarse. Los siguientes componentes están en estado INACTIVO: [Lista de Materiales]."
+HU05_C5 = (
+    "La cantidad del material '[NombreMaterial]' debe ser un número entero, "
+    "porque su unidad de medida es Unidad (und). Valor recibido: [Cantidad]."
+)
+HU05_C6_1 = "Ya existe una fórmula registrada con el nombre '[NombreIngresado]'. Indique un nombre único para la receta."
+HU05_C6_2 = "Fórmula '[Nombre]' registrada exitosamente en estado BORRADOR con el código [form-NNN]."
+HU05_C8 = "Error interno de conexión con la base de datos al registrar la fórmula. Por favor, reintente más tarde."
+HU05_C9_1_A = "El campo 'Nombre' admite máximo 80 caracteres."
+HU05_C9_1_B = "El campo 'Nombre' solo admite letras y espacios."
+HU05_C9_2 = "El campo 'Aplicación técnica' admite máximo 200 caracteres."
+HU05_C9_3 = "El material '[IDMaterial]' está repetido en la tabla de Componentes. Cada material debe aparecer una sola vez."
+HU05_C9_4 = "El campo 'Unidad de medida' es de solo lectura: el sistema la toma del material registrado."
+
+
+# HU-03 · Modificar material -------------------------------------------------------------
+# c2.1 · 400
+HU03_C2_1 = "El campo 'SKU' es de solo lectura y no puede ser modificado"
+# c2.2 · 400
+HU03_C2_2 = "El campo 'Unidad de medida' es de solo lectura y no puede ser modificado"
+# c2.3 · 400
+HU03_C2_3 = "El campo nombre es obligatorio, por favor, ingrésalo e intenta nuevamente"
+# c2.4 · 400
+HU03_C2_4_A = "El campo nombre debe tener entre 3 y 100 caracteres"
+# c2.4 · 400
+HU03_C2_4_B = "El campo nombre contiene caracteres no permitidos"
+# c2.5 · 400 · marcadores: [valor]
+HU03_C2_5 = "La categoría '[valor]' no es válida. Valores permitidos: Materia Prima, Componentes o Lubricantes"
+# c2.6 · 400
+HU03_C2_6 = "El campo densidad es obligatorio y debe contener un valor numérico positivo de máximo 4 caracteres"
+# c2.7 · 400
+HU03_C2_7 = "El campo pureza es obligatorio y debe estar en una escala de 0 a 100% con máximo 3 caracteres"
+# c2.8 · 400
+HU03_C2_8 = "El campo 'ID' es de solo lectura y no puede ser modificado"
+# c3 · 409 · marcadores: [Nombre]
+HU03_C3 = "El material con el nombre '[Nombre]' ya se encuentra registrado en el catálogo"
+# c5 · 409 · marcadores: [Nombre]
+HU03_C5 = "Inventario ya tiene registrado un artículo con el nombre '[Nombre]'. Indique un nombre diferente para el material"
+# c6 · 503
+HU03_C6 = "Error de comunicación con el módulo Inventario al actualizar el material. Por favor reintente más tarde"
+# c7 · 200 · marcadores: [Nombre]
+HU03_C7 = "Material '[Nombre]' actualizado exitosamente"
+# c8 · 404 · marcadores: [id_material]
+HU03_C8 = "El material solicitado con ID '[id_material]' no fue encontrado en el catálogo"
+# c9 · 409
+HU03_C9 = "No se pueden modificar materiales en estado INACTIVO. Debe reactivar el material antes de editar sus propiedades"
+# c10 · 500
+HU03_C10 = "Error interno al actualizar el material. La transacción fue cancelada"
 
 # CRUD básico de materiales ----------------------------------------------------------------
 # No están en el backlog: son los del CRUD de ejemplo (equivalente al de profesores del dojo).
