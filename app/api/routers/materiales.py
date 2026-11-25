@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, Path, Query, Response
 from app.api.dependencies import obtener_material_service
 from app.api.schemas.comun import mensaje_solicitud_invalida, respuestas_error
 from app.api.schemas.materiales import (
+    MaterialActualizadoRespuesta,
     MaterialActualizarSolicitud,
     MaterialCrearSolicitud,
     MaterialRegistradoRespuesta,
@@ -24,8 +25,12 @@ router = APIRouter(prefix="/materiales", tags=["Materiales"])
 
 Servicio = Annotated[MaterialService, Depends(obtener_material_service)]
 # ID secuencial mat-NNN (HU-01 c7.1); el patrón evita consultar la base con valores arbitrarios.
-IdMaterial = Annotated[str, Path(pattern=r"^mat-\d{3,6}$", description="Id del material (mat-NNN).", examples=["mat-001"])]
-ID_INVALIDO = mensaje_solicitud_invalida(mensajes.formatear(mensajes.MATERIAL_CAMPO_INVALIDO, campo="id"))
+# ID secuencial mat-NNN (HU-01 c7.1). Sin ``pattern``: HU-02 c4, HU-03 c8 y HU-04 c4
+# exigen que un id mal formado (p. ej. "abc") también responda 404 desde el servicio.
+IdMaterial = Annotated[str, Path(
+    description="Id del material (mat-NNN).",
+    examples=["mat-001"],
+)]
 
 
 @router.post(
@@ -68,7 +73,6 @@ async def buscar_por_nombre(
     response_model=MaterialRespuesta,
     summary="Buscar por id",
     responses=respuestas_error(400, 404, 500),
-    openapi_extra=ID_INVALIDO,
 )
 async def obtener_por_id(id_material: IdMaterial, servicio: Servicio) -> MaterialRespuesta:
     resultado = await servicio.obtener_por_id(id_material)
@@ -77,14 +81,23 @@ async def obtener_por_id(id_material: IdMaterial, servicio: Servicio) -> Materia
 
 @router.put(
     "/{id_material}",
-    response_model=MaterialRespuesta,
-    summary="Actualizar material",
-    responses=respuestas_error(400, 404, 409, 500),
-    openapi_extra=ID_INVALIDO,
+    status_code=200,
+    response_model=MaterialActualizadoRespuesta,
+    summary="Modificar un material (HU-03)",
+    description=(
+        "Actualiza Nombre, Categoría, Densidad y Pureza de un material ACTIVO. "
+        "ID, SKU y Unidad de medida son de solo lectura. Si el Nombre cambia, "
+        "se sincroniza con Inventario (PATCH /inventario/articulos/{sku}) antes de persistir."
+    ),
+    responses=respuestas_error(400, 404, 409, 500, 503),
 )
-async def actualizar(id_material: IdMaterial, solicitud: MaterialActualizarSolicitud, servicio: Servicio) -> MaterialRespuesta:
-    resultado = await servicio.actualizar(id_material, solicitud.a_datos())
-    return MaterialRespuesta.desde_modelo(resultado.datos)
+async def actualizar(
+    id_material: IdMaterial,
+    solicitud: MaterialActualizarSolicitud,
+    servicio: Servicio,
+) -> MaterialActualizadoRespuesta:
+    resultado = await servicio.actualizar(id_material, solicitud.a_comando())
+    return MaterialActualizadoRespuesta.con_mensaje(resultado.datos, resultado.mensaje or "")
 
 
 @router.delete(
@@ -92,7 +105,6 @@ async def actualizar(id_material: IdMaterial, solicitud: MaterialActualizarSolic
     status_code=204,
     summary="Eliminar material",
     responses=respuestas_error(400, 404, 500),
-    openapi_extra=ID_INVALIDO,
 )
 async def eliminar(id_material: IdMaterial, servicio: Servicio) -> Response:
     await servicio.eliminar(id_material)
