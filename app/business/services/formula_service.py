@@ -60,9 +60,7 @@ class FormulaService(ServicioBase):
                 raise
             raise _nombre_ya_registrado(comando.nombre) from exc
         self._publicar(TipoEvento.FORMULA_REGISTRADA, formulaId=formula.id_formula)
-        return Resultado(
-            formula, formatear(mensajes.HU05_C6_2, {"Nombre": formula.nombre, "form-NNN": formula.id_formula})
-        )
+        return Resultado(formula, formatear(mensajes.HU05_C6_2, {"Nombre": formula.nombre, "form-NNN": formula.id_formula}))
 
 
 def _nombre_ya_registrado(nombre: str) -> ConflictoError:

@@ -87,14 +87,15 @@ class MaterialRepositoryFalso(IMaterialRepository):
 
     async def listar_pagina(self, filtros: FiltrosMaterial, offset: int, limite: int) -> tuple[list[Material], int]:
         encontrados = [
-            m for m in self.materiales.values()
+            m
+            for m in self.materiales.values()
             if (filtros.nombre is None or filtros.nombre.lower() in m.nombre.lower())
             and (filtros.categoria is None or filtros.categoria == m.categoria)
             and (filtros.unidad_medida is None or filtros.unidad_medida == m.unidad_medida)
             and (filtros.estado is None or filtros.estado == m.estado)
         ]
         encontrados.sort(key=lambda m: (len(m.id_material), m.id_material))
-        return encontrados[offset:offset + limite], len(encontrados)
+        return encontrados[offset : offset + limite], len(encontrados)
 
     async def obtener_por_id(self, id_material: str) -> Material | None:
         return self.materiales.get(id_material)

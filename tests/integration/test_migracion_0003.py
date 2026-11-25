@@ -14,8 +14,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from tests.integration.conftest import configuracion_alembic
 
 FILA_DEL_CRUD = (
-    "INSERT INTO material (nombre, categoria, unidad_medida, densidad, pureza) "
-    "VALUES ('Acero del CRUD', 'Materia Prima', 'kg', 7.85, 98)"
+    "INSERT INTO material (nombre, categoria, unidad_medida, densidad, pureza) VALUES ('Acero del CRUD', 'Materia Prima', 'kg', 7.85, 98)"
 )
 
 

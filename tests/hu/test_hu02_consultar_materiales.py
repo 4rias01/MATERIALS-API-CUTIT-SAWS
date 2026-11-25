@@ -1,4 +1,5 @@
 """HU-02: contrato HTTP de consulta individual y paginada."""
+
 import pytest
 from fastapi import FastAPI
 from httpx import AsyncClient
@@ -19,7 +20,7 @@ def catalogo(app: FastAPI) -> MaterialRepositoryFalso:
 
 
 def test_c01_id_obligatorio(app: FastAPI) -> None:
-    parametro, = app.openapi()["paths"]["/materiales/{id_material}"]["get"]["parameters"]
+    (parametro,) = app.openapi()["paths"]["/materiales/{id_material}"]["get"]["parameters"]
     assert parametro["required"] and parametro["schema"]["type"] == "string"
     assert "mat-NNN" in parametro["description"]
 
@@ -30,16 +31,32 @@ async def test_c02_ficha(cliente: AsyncClient, catalogo: MaterialRepositoryFalso
     r = await cliente.get(f"/materiales/{material.id_material}")
     assert r.status_code == 200
     assert r.json() == {
-        "materialId": material.id_material, "sku": material.sku, "nombre": material.nombre,
-        "categoria": material.categoria, "unidadMedida": material.unidad_medida,
-        "densidad": 7.85, "pureza": 98, "fechaRegistro": "2026-10-20T15:30:00Z", "estado": estado,
+        "materialId": material.id_material,
+        "sku": material.sku,
+        "nombre": material.nombre,
+        "categoria": material.categoria,
+        "unidadMedida": material.unidad_medida,
+        "densidad": 7.85,
+        "pureza": 98,
+        "fechaRegistro": "2026-10-20T15:30:00Z",
+        "estado": estado,
     }
 
 
-@pytest.mark.parametrize(("campo", "valor"), [
-    ("nombre", "a" * 101), ("categoria", "Metales"), ("unidadMedida", "ml"), ("estado", "activo"),
-    ("pagina", "abc"), ("pagina", "0"), ("pagina", "1.0"), ("limite", "10"), ("unidad_medida", "kg"),
-])
+@pytest.mark.parametrize(
+    ("campo", "valor"),
+    [
+        ("nombre", "a" * 101),
+        ("categoria", "Metales"),
+        ("unidadMedida", "ml"),
+        ("estado", "activo"),
+        ("pagina", "abc"),
+        ("pagina", "0"),
+        ("pagina", "1.0"),
+        ("limite", "10"),
+        ("unidad_medida", "kg"),
+    ],
+)
 async def test_c03_filtro_invalido_sin_bd(cliente: AsyncClient, campo: str, valor: str) -> None:
     r = await cliente.get("/materiales", params={campo: valor})
     assert r.status_code == 400
@@ -73,8 +90,14 @@ async def test_c06_filtros_combinados(cliente: AsyncClient, catalogo: MaterialRe
     assert r.json()["materiales"] == [ficha.json()]
     for campo, distinto in (("nombre", "Metal"), ("categoria", "Componentes"), ("unidadMedida", "kg"), ("estado", "ACTIVO")):
         vacio = await cliente.get("/materiales", params={**filtros, campo: distinto})
-        assert vacio.json() == {"materiales": [], "pagina": 1, "tamanoPagina": 10, "totalRegistros": 0, "totalPaginas": 0,
-                                "mensaje": "No se encontraron materiales que coincidan con los criterios indicados"}
+        assert vacio.json() == {
+            "materiales": [],
+            "pagina": 1,
+            "tamanoPagina": 10,
+            "totalRegistros": 0,
+            "totalPaginas": 0,
+            "mensaje": "No se encontraron materiales que coincidan con los criterios indicados",
+        }
 
 
 async def test_c07_paginacion(cliente: AsyncClient, catalogo: MaterialRepositoryFalso) -> None:

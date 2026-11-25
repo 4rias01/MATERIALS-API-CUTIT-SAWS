@@ -73,9 +73,7 @@ class Configuracion(BaseSettings):
             raise ValueError("Defina POSTGRES_USER y POSTGRES_PASSWORD (o DATABASE_URL) en el entorno")
         usuario = quote(self.postgres_user, safe="")
         clave = quote(self.postgres_password.get_secret_value(), safe="")
-        return (
-            f"postgresql+asyncpg://{usuario}:{clave}@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
-        )
+        return f"postgresql+asyncpg://{usuario}:{clave}@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
 
 
 @lru_cache

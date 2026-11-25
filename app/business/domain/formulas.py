@@ -106,22 +106,16 @@ class MaterialComponente(Protocol):
     def unidad_medida(self) -> str: ...
 
 
-def validar_materiales(
-    componentes: tuple[ComponenteFormula, ...], materiales: Sequence[MaterialComponente | None]
-) -> None:
+def validar_materiales(componentes: tuple[ComponenteFormula, ...], materiales: Sequence[MaterialComponente | None]) -> None:
     faltantes = [c.material_id for c, m in zip(componentes, materiales, strict=True) if m is None]
     if faltantes:
         raise ReglaDeNegocioError(formatear(mensajes.HU05_C4_1, {"Lista de Materiales": ", ".join(faltantes)}))
-    inactivos = [
-        c.material_id for c, m in zip(componentes, materiales, strict=True) if m is not None and m.estado != EstadoMaterial.ACTIVO
-    ]
+    inactivos = [c.material_id for c, m in zip(componentes, materiales, strict=True) if m is not None and m.estado != EstadoMaterial.ACTIVO]
     if inactivos:
         raise ReglaDeNegocioError(formatear(mensajes.HU05_C4_2, {"Lista de Materiales": ", ".join(inactivos)}))
     for componente, material in zip(componentes, materiales, strict=True):
         if material is not None and material.unidad_medida == UnidadMedida.UNIDAD and componente.cantidad % 1:
-            raise ReglaDeNegocioError(
-                formatear(mensajes.HU05_C5, NombreMaterial=material.nombre, Cantidad=componente.cantidad)
-            )
+            raise ReglaDeNegocioError(formatear(mensajes.HU05_C5, NombreMaterial=material.nombre, Cantidad=componente.cantidad))
 
 
 def id_formula(numero: int) -> str:

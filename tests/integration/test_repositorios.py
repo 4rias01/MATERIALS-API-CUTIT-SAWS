@@ -24,7 +24,12 @@ async def test_material_se_guarda_con_el_repositorio(sesion: AsyncSession, otra_
     await _guardar(sesion, un_material(1, nombre="Acero al carbono"))
     material = await otra_sesion.get(Material, "mat-001")
     assert material is not None
-    assert (material.nombre, material.sku, material.estado, material.densidad) == ("Acero al carbono", "MP-00001", "ACTIVO", Decimal("7.85"))
+    assert (material.nombre, material.sku, material.estado, material.densidad) == (
+        "Acero al carbono",
+        "MP-00001",
+        "ACTIVO",
+        Decimal("7.85"),
+    )
     assert material.fecha_registro.tzinfo is not None
 
 

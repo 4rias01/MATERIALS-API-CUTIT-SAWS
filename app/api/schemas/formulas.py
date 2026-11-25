@@ -124,7 +124,9 @@ class FormulaRegistradaRespuesta(EsquemaSalida):
             fecha_ultima_actualizacion=formula.fecha_actualizacion,
             componentes=[
                 ComponenteRegistradoRespuesta(
-                    sku=c.material.sku, nombre=c.material.nombre, cantidad=c.cantidad,
+                    sku=c.material.sku,
+                    nombre=c.material.nombre,
+                    cantidad=c.cantidad,
                     unidad_medida=UnidadMedida(c.material.unidad_medida),
                 )
                 for c in formula.componentes

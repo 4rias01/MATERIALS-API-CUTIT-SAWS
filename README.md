@@ -236,10 +236,9 @@ El manejador global responde 400 con ese texto y el traceId.
 
 ```python
 class MaterialService(ServicioBase):
-    @operacion_de_negocio("REGISTRAR_MATERIAL", "material", mensaje_error_bd=mensajes.HU01_C8,
-                          mensaje_servicio_externo=mensajes.HU01_C6)
+    @operacion_de_negocio("REGISTRAR_MATERIAL", "material", mensaje_error_bd=mensajes.HU01_C8, mensaje_servicio_externo=mensajes.HU01_C6)
     async def registrar(self, comando: RegistrarMaterialComando) -> Resultado[Material]:
-        async with self._uow:                                   # Unit of Work: una transacción
+        async with self._uow:  # Unit of Work: una transacción
             if await self._materiales.existe_nombre(comando.nombre):
                 raise ConflictoError(formatear(mensajes.HU01_C3, Nombre=comando.nombre))
         ...

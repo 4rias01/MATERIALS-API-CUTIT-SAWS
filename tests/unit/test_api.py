@@ -67,7 +67,9 @@ async def test_reutiliza_el_trace_id_recibido_si_es_valido(cliente: httpx.AsyncC
         (DependenciaNoDisponibleError("f"), 503),
     ],
 )
-async def test_cada_error_de_aplicacion_se_traduce_a_su_codigo(app: FastAPI, cliente: httpx.AsyncClient, error: Exception, codigo: int) -> None:
+async def test_cada_error_de_aplicacion_se_traduce_a_su_codigo(
+    app: FastAPI, cliente: httpx.AsyncClient, error: Exception, codigo: int
+) -> None:
     _ruta_que_lanza(app, "/prueba-error", error)
     r = await cliente.get("/prueba-error")
     assert r.status_code == codigo
@@ -100,7 +102,9 @@ async def test_ruta_inexistente_y_metodo_no_permitido(cliente: httpx.AsyncClient
 async def test_validacion_usa_el_mensaje_de_la_ruta(app: FastAPI, cliente: httpx.AsyncClient) -> None:
     async def con_parametro(numero: int) -> None: ...
 
-    app.add_api_route("/prueba-validacion/{numero}", con_parametro, methods=["GET"], openapi_extra=mensaje_solicitud_invalida("Mensaje de la ruta"))
+    app.add_api_route(
+        "/prueba-validacion/{numero}", con_parametro, methods=["GET"], openapi_extra=mensaje_solicitud_invalida("Mensaje de la ruta")
+    )
     r = await cliente.get("/prueba-validacion/no-es-un-numero")
     assert (r.status_code, r.json()["mensaje"]) == (400, "Mensaje de la ruta")
 

@@ -14,7 +14,9 @@ Servicio = Annotated[FormulaService, Depends(obtener_formula_service)]
 
 
 @router.post(
-    "", status_code=201, response_model=FormulaRegistradaRespuesta,
+    "",
+    status_code=201,
+    response_model=FormulaRegistradaRespuesta,
     summary="Registrar una fórmula (HU-05)",
     description="Registra una fórmula en BORRADOR con al menos dos materiales activos. No modifica existencias.",
     responses=respuestas_error(400, 409, 422, 500),
