@@ -83,15 +83,13 @@ async def test_actualizar_pasa_el_id_de_la_ruta_y_los_datos(cliente: httpx.Async
     servicio = con_servicio(Resultado(un_material()))
     r = await cliente.put("/materiales/mat-001", json={k: v for k, v in CUERPO.items() if k != "unidadMedida"})
     assert r.status_code == 200
-    assert servicio.llamadas == [("actualizar", ("mat-001", ActualizarMaterialComando("Material 1", "Materia Prima", Decimal("7.85"), Decimal("98"))))]
+    assert servicio.llamadas == [
+        ("actualizar", ("mat-001", ActualizarMaterialComando("Material 1", "Materia Prima", Decimal("7.85"), Decimal("98"))))
+    ]
 
 
 @pytest.mark.parametrize("id_invalido", ["1", "abc", "mat-1", "MAT-001", "mat-0000001"])
-async def test_id_inexistente_en_consulta_responde_404(
-    cliente: httpx.AsyncClient, app: FastAPI, id_invalido: str
-) -> None:
+async def test_id_inexistente_en_consulta_responde_404(cliente: httpx.AsyncClient, app: FastAPI, id_invalido: str) -> None:
     app.dependency_overrides[dependencies.obtener_repositorio_materiales] = lambda: MaterialRepositoryFalso()
     r = await cliente.get(f"/materiales/{id_invalido}")
-    assert (r.status_code, r.json()["mensaje"]) == (
-        404, f"El material solicitado con ID '{id_invalido}' no fue encontrado en el catálogo"
-    )
+    assert (r.status_code, r.json()["mensaje"]) == (404, f"El material solicitado con ID '{id_invalido}' no fue encontrado en el catálogo")

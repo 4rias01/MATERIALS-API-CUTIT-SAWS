@@ -28,12 +28,8 @@ def upgrade() -> None:
         sa.Column("fecha_registro", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         sa.Column("fecha_actualizacion", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         sa.PrimaryKeyConstraint("id_material", name=op.f("pk_material")),
-        sa.CheckConstraint(
-            "categoria IN ('Materia Prima', 'Componentes', 'Lubricantes')", name=op.f("ck_material_categoria")
-        ),
-        sa.CheckConstraint(
-            "unidad_medida IN ('und', 'g', 'kg', 'mL', 'L', 'm')", name=op.f("ck_material_unidad_medida")
-        ),
+        sa.CheckConstraint("categoria IN ('Materia Prima', 'Componentes', 'Lubricantes')", name=op.f("ck_material_categoria")),
+        sa.CheckConstraint("unidad_medida IN ('und', 'g', 'kg', 'mL', 'L', 'm')", name=op.f("ck_material_unidad_medida")),
         sa.CheckConstraint("densidad > 0", name=op.f("ck_material_densidad_positiva")),
         sa.CheckConstraint("pureza >= 0 AND pureza <= 100", name=op.f("ck_material_pureza_rango")),
     )

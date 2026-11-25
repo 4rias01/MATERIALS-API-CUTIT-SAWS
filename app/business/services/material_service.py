@@ -147,9 +147,7 @@ class MaterialService(ServicioBase):
 
     # --- CRUD básico: escrituras (se auditan) ----------------------------------------
 
-
-
-# --- HU-03 · Modificar material --------------------------------------------------
+    # --- HU-03 · Modificar material --------------------------------------------------
 
     @operacion_de_negocio(
         OPERACION_ACTUALIZAR,
@@ -161,33 +159,33 @@ class MaterialService(ServicioBase):
     async def actualizar(self, id_material: str, comando: ActualizarMaterialComando) -> Resultado[Material]:
         """HU-03 · PUT /materiales/{id} → 200 con el material actualizado y ``HU03_C7``."""
         nombre = normalizar_nombre(comando.nombre)
-        mensaje_404 = formatear(mensajes.HU03_C8, id_material=id_material)   # c8
+        mensaje_404 = formatear(mensajes.HU03_C8, id_material=id_material)  # c8
 
         # --- Fase 1: validaciones (solo lectura)
         async with self._uow:
-            material = await self._obtener_o_404(id_material, mensaje_404)   # c8
-            if material.estado != EstadoMaterial.ACTIVO.value:               # c9
+            material = await self._obtener_o_404(id_material, mensaje_404)  # c8
+            if material.estado != EstadoMaterial.ACTIVO.value:  # c9
                 raise ConflictoError(mensajes.HU03_C9)
             if await self._materiales.existe_nombre(nombre, excluir_id=id_material):  # c3
                 raise _nombre_duplicado_hu03(nombre)
             sku = material.sku
-            nombre_cambio = material.nombre != nombre                        # c4
+            nombre_cambio = material.nombre != nombre  # c4
 
         # --- Fase 2: sincronización con Inventario (solo si el Nombre cambió)
         if nombre_cambio:
-            await self._actualizar_en_inventario(sku, nombre)                # c4/c5/c6
+            await self._actualizar_en_inventario(sku, nombre)  # c4/c5/c6
 
         # --- Fase 3: persistencia atómica
         try:
             async with self._uow:
-                material = await self._obtener_o_404(id_material, mensaje_404)   # c8
-                if material.estado != EstadoMaterial.ACTIVO.value:               # c9 (concurrencia)
+                material = await self._obtener_o_404(id_material, mensaje_404)  # c8
+                if material.estado != EstadoMaterial.ACTIVO.value:  # c9 (concurrencia)
                     raise ConflictoError(mensajes.HU03_C9)
                 material.nombre = nombre
                 material.categoria = comando.categoria
                 material.densidad = comando.densidad
                 material.pureza = comando.pureza
-                material.fecha_actualizacion = ahora()                           # c7
+                material.fecha_actualizacion = ahora()  # c7
                 self._auditar(OPERACION_ACTUALIZAR, RECURSO, id_material, 200, {"sku": sku})
                 await self._uow.commit()
         except ErrorIntegridadDatos as exc:
@@ -196,7 +194,9 @@ class MaterialService(ServicioBase):
                 raise
             logger.warning(
                 "Nombre registrado por una petición simultánea; Inventario ya tiene %r para el SKU %s",
-                nombre, sku, extra={"sku": sku, "nombre": nombre},
+                nombre,
+                sku,
+                extra={"sku": sku, "nombre": nombre},
             )
             raise _nombre_duplicado_hu03(nombre) from exc
         except ErrorBaseDatos:
@@ -205,7 +205,6 @@ class MaterialService(ServicioBase):
 
         self._publicar(TipoEvento.MATERIAL_ACTUALIZADO, materialId=id_material)
         return Resultado(material, formatear(mensajes.HU03_C7, Nombre=nombre))
-
 
     async def _actualizar_en_inventario(self, sku: str, nombre: str) -> None:
         """c4: PATCH /inventario/articulos/{sku} con el nuevo Nombre.
@@ -263,9 +262,7 @@ class MaterialService(ServicioBase):
         literal del backlog; si se omite, se usa el genérico del CRUD."""
         material = await self._materiales.obtener_por_id(id_material)
         if material is None:
-            raise RecursoNoEncontradoError(
-                mensaje or formatear(mensajes.MATERIAL_NO_ENCONTRADO, id=id_material)
-            )
+            raise RecursoNoEncontradoError(mensaje or formatear(mensajes.MATERIAL_NO_ENCONTRADO, id=id_material))
         return material
 
 
@@ -284,7 +281,9 @@ def _registrar_fallo_al_actualizar(sku: str, nombre: str) -> None:
     # (Inventario ya tiene el nombre nuevo pero Materiales no lo persistió).
     logger.error(
         "No se pudo actualizar el material; Inventario ya tiene el nombre %r para el SKU %s",
-        nombre, sku, extra={"sku": sku, "nombre": nombre},
+        nombre,
+        sku,
+        extra={"sku": sku, "nombre": nombre},
     )
 
 

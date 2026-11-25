@@ -29,10 +29,13 @@ router = APIRouter(prefix="/materiales", tags=["Materiales"])
 Servicio = Annotated[MaterialService, Depends(obtener_material_service)]
 # ID secuencial mat-NNN (HU-01 c7.1). Sin ``pattern``: HU-02 c4, HU-03 c8 y HU-04 c4
 # exigen que un id mal formado (p. ej. "abc") también responda 404 desde el servicio.
-IdMaterial = Annotated[str, Path(
-    description="Id del material (mat-NNN).",
-    examples=["mat-001"],
-)]
+IdMaterial = Annotated[
+    str,
+    Path(
+        description="Id del material (mat-NNN).",
+        examples=["mat-001"],
+    ),
+]
 
 
 @router.post(
@@ -70,9 +73,7 @@ async def listar_materiales(consulta: Annotated[ConsultaMaterial, Query()], serv
     responses=respuestas_error(400, 500),
     openapi_extra=mensaje_solicitud_invalida(mensajes.formatear(mensajes.MATERIAL_CAMPO_INVALIDO, campo="nombre")),
 )
-async def buscar_por_nombre(
-    servicio: Servicio, nombre: Annotated[str, Query(min_length=1, max_length=100)]
-) -> list[MaterialRespuesta]:
+async def buscar_por_nombre(servicio: Servicio, nombre: Annotated[str, Query(min_length=1, max_length=100)]) -> list[MaterialRespuesta]:
     resultado = await servicio.buscar_por_nombre(nombre)
     return [MaterialRespuesta.desde_modelo(m) for m in resultado.datos]
 

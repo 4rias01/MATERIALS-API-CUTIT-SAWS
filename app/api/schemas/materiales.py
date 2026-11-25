@@ -21,7 +21,6 @@ from app.business.domain.value_objects import Densidad, NombreMaterial, Pureza, 
 from app.business.services.comandos import ActualizarMaterialComando, RegistrarMaterialComando
 from app.business.services.material_service import FiltrosMaterial
 
-
 # ---------------------------------------------------------------------------------------
 # Entrada
 # ---------------------------------------------------------------------------------------
@@ -116,13 +115,13 @@ class MaterialCrearSolicitud(EsquemaEntrada):
 
 # c2.1, c2.2 y c2.8: los tres campos de solo lectura con mensaje propio.
 _MENSAJES_CAMPO_SOLO_LECTURA: dict[str, str] = {
-    "id":            mensajes.HU03_C2_8,
-    "materialId":    mensajes.HU03_C2_8,
-    "material_id":   mensajes.HU03_C2_8,
-    "idMaterial":    mensajes.HU03_C2_8,
-    "id_material":   mensajes.HU03_C2_8,
-    "sku":           mensajes.HU03_C2_1,
-    "unidadMedida":  mensajes.HU03_C2_2,
+    "id": mensajes.HU03_C2_8,
+    "materialId": mensajes.HU03_C2_8,
+    "material_id": mensajes.HU03_C2_8,
+    "idMaterial": mensajes.HU03_C2_8,
+    "id_material": mensajes.HU03_C2_8,
+    "sku": mensajes.HU03_C2_1,
+    "unidadMedida": mensajes.HU03_C2_2,
     "unidad_medida": mensajes.HU03_C2_2,
 }
 
@@ -136,12 +135,12 @@ class MaterialActualizarSolicitud(EsquemaEntrada):
     """
 
     mensajes_error: ClassVar[dict[tuple[str, str], str]] = {
-        ("nombre", "missing"):    mensajes.HU03_C2_3,
-        ("nombre", "*"):          mensajes.HU03_C2_3,   # defensivo
-        ("densidad", "missing"):  mensajes.HU03_C2_6,
-        ("densidad", "*"):        mensajes.HU03_C2_6,
-        ("pureza", "missing"):    mensajes.HU03_C2_7,
-        ("pureza", "*"):          mensajes.HU03_C2_7,
+        ("nombre", "missing"): mensajes.HU03_C2_3,
+        ("nombre", "*"): mensajes.HU03_C2_3,  # defensivo
+        ("densidad", "missing"): mensajes.HU03_C2_6,
+        ("densidad", "*"): mensajes.HU03_C2_6,
+        ("pureza", "missing"): mensajes.HU03_C2_7,
+        ("pureza", "*"): mensajes.HU03_C2_7,
     }
 
     nombre: str = Field(

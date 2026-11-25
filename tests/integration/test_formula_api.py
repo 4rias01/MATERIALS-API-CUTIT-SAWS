@@ -38,9 +38,7 @@ async def cliente_formula(motor: AsyncEngine, url_base_datos: str) -> AsyncItera
         yield cliente
 
 
-async def test_registro_persiste_formula_componentes_y_auditoria(
-    cliente_formula: httpx.AsyncClient, otra_sesion: AsyncSession
-) -> None:
+async def test_registro_persiste_formula_componentes_y_auditoria(cliente_formula: httpx.AsyncClient, otra_sesion: AsyncSession) -> None:
     r = await cliente_formula.post("/formulas", json=_cuerpo())
     assert r.status_code == 201, r.json()
     formula = (await otra_sesion.scalars(select(Formula))).one()

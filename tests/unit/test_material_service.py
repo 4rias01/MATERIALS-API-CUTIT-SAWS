@@ -55,7 +55,9 @@ def servicio(
 
 
 def comando(nombre: str = "Acero al carbono") -> RegistrarMaterialComando:
-    return RegistrarMaterialComando(nombre=nombre, categoria="Materia Prima", unidad_medida="kg", densidad=Decimal("7.85"), pureza=Decimal("98"))
+    return RegistrarMaterialComando(
+        nombre=nombre, categoria="Materia Prima", unidad_medida="kg", densidad=Decimal("7.85"), pureza=Decimal("98")
+    )
 
 
 def datos_material(nombre: str = "Acero al carbono") -> ActualizarMaterialComando:

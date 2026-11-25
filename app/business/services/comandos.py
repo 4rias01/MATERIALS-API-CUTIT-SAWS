@@ -21,6 +21,7 @@ class RegistrarMaterialComando:
     densidad: Decimal
     pureza: Decimal
 
+
 @dataclass(frozen=True, slots=True)
 class ActualizarMaterialComando:
     """HU-03: PUT /materiales/{id}. Unidad de medida es de solo lectura, no va aquí."""
