@@ -2,8 +2,17 @@
 
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
+from dataclasses import dataclass
 
 from app.infraestructure.models import Material
+
+
+@dataclass(frozen=True, slots=True)
+class FiltrosMaterial:
+    nombre: str | None = None
+    categoria: str | None = None
+    unidad_medida: str | None = None
+    estado: str | None = None
 
 
 class IMaterialRepository(ABC):
@@ -38,3 +47,7 @@ class IMaterialRepository(ABC):
     @abstractmethod
     async def eliminar(self, material: Material) -> None:
         """Marca el material para borrarlo en la transacción en curso."""
+
+    @abstractmethod
+    async def listar_pagina(self, filtros: FiltrosMaterial, offset: int, limite: int) -> tuple[list[Material], int]:
+        """Devuelve la página ordenada y el total de coincidencias antes de paginar."""

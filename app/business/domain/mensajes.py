@@ -61,6 +61,16 @@ HU01_C7 = "Material '[Nombre]' registrado exitosamente con el SKU [SKU]."
 HU01_C8 = "Error interno de conexión con la base de datos. Por favor reintente más tarde"
 
 
+# HU-02 · Consultar materiales
+HU02_C3 = (
+    "El valor del filtro de búsqueda '[NombreParametro]' es inválido. "
+    "Por favor verifique los valores o tipos de datos ingresados."
+)
+HU02_C4 = "El material solicitado con ID '[IDIngresado]' no fue encontrado en el catálogo"
+HU02_C5 = "Error de comunicación con la base de datos al consultar el material. TraceID: [traceId]"
+HU02_C7 = "No se encontraron materiales que coincidan con los criterios indicados"
+
+
 # HU-05 · Registrar fórmula --------------------------------------------------------------
 HU05_C2_1 = "El campo 'Nombre' es obligatorio. Por favor, ingréselo e intente nuevamente."
 HU05_C2_2 = "El campo 'Aplicación técnica' es obligatorio. Por favor, ingréselo e intente nuevamente."

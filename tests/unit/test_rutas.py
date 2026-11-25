@@ -14,7 +14,8 @@ from fastapi import FastAPI
 
 from app.api import dependencies
 from app.business.services.base import Resultado
-from app.business.services.comandos import DatosMaterial, RegistrarMaterialComando
+from app.business.services.comandos import ActualizarMaterialComando, RegistrarMaterialComando
+from tests.dobles import MaterialRepositoryFalso
 from tests.fabricas import un_material
 
 MATERIAL_JSON = {
@@ -74,22 +75,23 @@ async def test_registrar_material_201(cliente: httpx.AsyncClient, con_servicio: 
 async def test_consultas_responden_el_material_sin_mensaje(cliente: httpx.AsyncClient, con_servicio: ConServicio) -> None:
     servicio = con_servicio(Resultado(un_material()))
     r = await cliente.get("/materiales/mat-001")
-    assert (r.status_code, r.json()) == (200, MATERIAL_JSON)
+    assert (r.status_code, r.json()) == (200, {k: v for k, v in MATERIAL_JSON.items() if k != "fechaUltimaActualizacion"})
     assert servicio.llamadas == [("obtener_por_id", ("mat-001",))]
 
 
 async def test_actualizar_pasa_el_id_de_la_ruta_y_los_datos(cliente: httpx.AsyncClient, con_servicio: ConServicio) -> None:
     servicio = con_servicio(Resultado(un_material()))
-    r = await cliente.put("/materiales/mat-001", json=CUERPO)
+    r = await cliente.put("/materiales/mat-001", json={k: v for k, v in CUERPO.items() if k != "unidadMedida"})
     assert r.status_code == 200
-    assert servicio.llamadas == [("actualizar", ("mat-001", DatosMaterial("Material 1", "Materia Prima", "kg", Decimal("7.85"), Decimal("98"))))]
+    assert servicio.llamadas == [("actualizar", ("mat-001", ActualizarMaterialComando("Material 1", "Materia Prima", Decimal("7.85"), Decimal("98"))))]
 
 
 @pytest.mark.parametrize("id_invalido", ["1", "abc", "mat-1", "MAT-001", "mat-0000001"])
-async def test_id_con_formato_invalido_responde_400_sin_llamar_al_servicio(
-    cliente: httpx.AsyncClient, con_servicio: ConServicio, id_invalido: str
+async def test_id_inexistente_en_consulta_responde_404(
+    cliente: httpx.AsyncClient, app: FastAPI, id_invalido: str
 ) -> None:
-    servicio = con_servicio(Resultado(un_material()))
+    app.dependency_overrides[dependencies.obtener_repositorio_materiales] = lambda: MaterialRepositoryFalso()
     r = await cliente.get(f"/materiales/{id_invalido}")
-    assert (r.status_code, r.json()["mensaje"]) == (400, "El campo 'id' es obligatorio o no tiene un formato válido.")
-    assert servicio.llamadas == []
+    assert (r.status_code, r.json()["mensaje"]) == (
+        404, f"El material solicitado con ID '{id_invalido}' no fue encontrado en el catálogo"
+    )

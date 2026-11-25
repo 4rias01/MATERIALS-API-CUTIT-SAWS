@@ -6,6 +6,7 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import ErrorIntegridadDatos
+from app.infraestructure.interfaces.material_repository import FiltrosMaterial
 from app.infraestructure.models import Material
 from app.infraestructure.repositories import MaterialRepository
 from app.infraestructure.unit_of_work import UnitOfWork
@@ -74,3 +75,14 @@ async def test_restricciones_check_del_material(sesion: AsyncSession, cambios: d
 async def test_secuencia_del_id(sesion: AsyncSession) -> None:
     repositorio = MaterialRepository(sesion)
     assert [await repositorio.siguiente_numero() for _ in range(3)] == [1, 2, 3]
+
+
+async def test_consulta_materiales_con_paginacion_y_busqueda_literal(sesion: AsyncSession) -> None:
+    await _guardar(sesion, un_material(1000, nombre="Acero fino"), un_material(999, nombre="ACERO A"))
+    repo = MaterialRepository(sesion)
+    filtros = FiltrosMaterial(nombre="cEr", categoria="Materia Prima", unidad_medida="kg", estado="ACTIVO")
+    pagina, total = await repo.listar_pagina(filtros, 1, 1)
+    assert total == 2 and [m.id_material for m in pagina] == ["mat-1000"]
+    assert await repo.obtener_por_id("mat-1000") is pagina[0]
+    assert await repo.listar_pagina(filtros, 2, 1) == ([], 2)
+    assert await repo.listar_pagina(FiltrosMaterial(nombre="%"), 0, 10) == ([], 0)
