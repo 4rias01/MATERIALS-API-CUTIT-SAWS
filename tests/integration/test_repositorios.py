@@ -3,6 +3,7 @@
 from decimal import Decimal
 
 import pytest
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import ErrorIntegridadDatos
@@ -40,6 +41,16 @@ async def test_nombre_unico_sin_distinguir_mayusculas_incluso_con_tildes(sesion:
     assert await repositorio.existe_nombre("ácido cítrico")
     assert not await repositorio.existe_nombre("Acido Citrico")
     assert not await repositorio.existe_nombre("ácido cítrico", excluir_id="mat-001")
+
+
+async def test_lectura_para_actualizar_reserva_la_fila_hasta_el_commit(sesion: AsyncSession, otra_sesion: AsyncSession) -> None:
+    await _guardar(sesion, un_material(1))
+    filas_disponibles = select(Material.id_material).with_for_update(skip_locked=True)
+    async with UnitOfWork(sesion) as uow:
+        assert await MaterialRepository(sesion).obtener_por_id("mat-001", para_actualizar=True) is not None
+        assert await otra_sesion.scalar(filas_disponibles) is None
+        await uow.commit()
+    assert await otra_sesion.scalar(filas_disponibles) == "mat-001"
 
 
 async def test_el_indice_unico_impide_nombres_repetidos(sesion: AsyncSession) -> None:

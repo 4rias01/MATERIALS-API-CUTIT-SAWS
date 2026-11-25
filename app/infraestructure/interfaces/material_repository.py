@@ -19,8 +19,8 @@ class IMaterialRepository(ABC):
     """Acceso a la tabla material. Los cambios se confirman con la unidad de trabajo."""
 
     @abstractmethod
-    async def obtener_por_id(self, id_material: str) -> Material | None:
-        """El material con ese id (mat-NNN), o None si no existe."""
+    async def obtener_por_id(self, id_material: str, *, para_actualizar: bool = False) -> Material | None:
+        """Obtiene el material. Para una actualización, bloquea la fila hasta terminar la transacción."""
 
     @abstractmethod
     async def listar(self) -> Sequence[Material]:

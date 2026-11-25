@@ -2,7 +2,8 @@
 
 * POST: HU-01 (registrar material).
 * GET: ficha técnica y listado paginado (HU-02).
-* El CRUD conserva la búsqueda por nombre, la actualización y la eliminación.
+* PUT: modificación de materiales activos (HU-03).
+* El CRUD conserva la búsqueda por nombre y la eliminación.
 """
 
 from typing import Annotated

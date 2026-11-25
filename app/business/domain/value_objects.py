@@ -28,7 +28,7 @@ _ESPACIOS_REPETIDOS = re.compile(r" {2,}")
 
 def normalizar_nombre(texto: str) -> str:
     """Quita los espacios al inicio y al final y reduce a uno los repetidos (HU-01 c1)."""
-    return _ESPACIOS_REPETIDOS.sub(" ", texto.strip())
+    return _ESPACIOS_REPETIDOS.sub(" ", texto.strip(" "))
 
 
 def a_decimal(valor: object, campo: str) -> Decimal:
@@ -44,9 +44,24 @@ def a_decimal(valor: object, campo: str) -> Decimal:
     return numero
 
 
+def decimales_significativos(numero: Decimal) -> int:
+    """Cuenta los decimales sin ceros finales, redondeos ni expansión de exponentes."""
+    if numero.is_zero():
+        return 0
+    partes = numero.as_tuple()
+    decimales = -int(partes.exponent)
+    for digito in reversed(partes.digits):
+        if digito != 0:
+            break
+        decimales -= 1
+    return max(0, decimales)
+
+
 def contar_caracteres(numero: Decimal) -> int:
     """Caracteres del número sin ceros sobrantes ni notación científica (7.850 → "7.85" → 4)."""
-    return len(format(numero.normalize(), "f"))
+    enteros = 1 if numero.is_zero() else max(1, numero.adjusted() + 1)
+    decimales = decimales_significativos(numero)
+    return int(numero.is_signed()) + enteros + (1 + decimales if decimales else 0)
 
 
 # ---------------------------------------------------------------------------------------
