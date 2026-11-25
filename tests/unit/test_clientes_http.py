@@ -220,7 +220,8 @@ async def test_registrar_materia_prima_devuelve_el_codigo_de_articulo() -> None:
 
     def manejador(peticion: httpx.Request) -> httpx.Response:
         recibidas.append(peticion)
-        return httpx.Response(201, json={"codigo": "MP-00007"})
+        # Contrato publicado por Inventario (/v3/api-docs): RegistroArticuloDto.
+        return httpx.Response(200, json={"mensaje": "Registrado", "articulo": {"codigo": "MP-00007", "tipo": "MATERIA_PRIMA"}})
 
     cliente = _inventario(manejador)
     assert isinstance(cliente, IInventarioClient)
@@ -239,7 +240,16 @@ async def test_nombre_duplicado_en_inventario() -> None:
 
 @pytest.mark.parametrize(
     "respuesta",
-    [httpx.Response(201, json={}), httpx.Response(201, json={"codigo": 7}), httpx.Response(400, json={"mensaje": "x"})],
+    [
+        httpx.Response(200, json={}),
+        httpx.Response(200, json={"articulo": None}),
+        httpx.Response(200, json={"articulo": "MP-00007"}),
+        httpx.Response(200, json={"articulo": {}}),
+        httpx.Response(200, json={"articulo": {"codigo": 7}}),
+        httpx.Response(200, json={"articulo": {"codigo": ""}}),
+        httpx.Response(200, json={"codigo": "MP-00007"}),
+        httpx.Response(400, json={"mensaje": "x"}),
+    ],
 )
 async def test_respuestas_inesperadas_de_inventario(respuesta: httpx.Response) -> None:
     with pytest.raises(ErrorServicioExterno) as error:

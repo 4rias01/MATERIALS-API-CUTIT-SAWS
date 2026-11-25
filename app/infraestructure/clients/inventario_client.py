@@ -1,9 +1,10 @@
 """Cliente de la API de Inventario (célula 4).
 
-El backlog fija la ruta (POST /inventario/materias-primas, HU-01 c4) y qué datos se
-envían, pero no los nombres de los campos JSON ni el código HTTP con que Inventario
-rechaza un nombre repetido. Esos valores están en las constantes POR ACORDAR de abajo y
-deben confirmarse con la célula de Inventario.
+El alta (POST /inventario/materias-primas, HU-01 c4) sigue el contrato que publica Inventario
+en ``/v3/api-docs``: recibe ``nombre`` y ``unidadMedida`` y responde
+``{"mensaje": ..., "articulo": {"codigo": "MP-00000", ...}}``. Ese contrato no documenta los
+errores ni incluye todavía PATCH /inventario/articulos/{codigo} (HU-03 c4): lo marcado POR
+ACORDAR debe confirmarse con la célula de Inventario.
 """
 
 import httpx
@@ -15,10 +16,13 @@ from app.infraestructure.interfaces.inventario_client import IInventarioClient, 
 
 SERVICIO = "inventario"
 
-# --- POR ACORDAR con la célula de Inventario ------------------------------------------
+# --- Contrato del alta publicado por Inventario ----------------------------------------
 CAMPO_NOMBRE = "nombre"
 CAMPO_UNIDAD_MEDIDA = "unidadMedida"
-CAMPO_CODIGO_ARTICULO = "codigo"  # en la respuesta del alta: el Código de artículo (MP-00000)
+CAMPO_ARTICULO = "articulo"  # en la respuesta del alta: el artículo creado
+CAMPO_CODIGO_ARTICULO = "codigo"  # dentro de "articulo": el Código de artículo (MP-00000)
+
+# --- POR ACORDAR con la célula de Inventario ------------------------------------------
 CAMPO_MENSAJE = "mensaje"  # en las respuestas de error
 ESTADO_NOMBRE_DUPLICADO = 409  # "Ya existe un artículo con el nombre [Nombre]" (HU-01 c5)
 ESTADOS_ALTA_EXITOSA = (200, 201)
@@ -50,7 +54,8 @@ class InventarioClient(ClienteHttpBase, IInventarioClient):
             raise NombreDuplicadoEnInventarioError(self._json(respuesta).get(CAMPO_MENSAJE))
         if respuesta.status_code not in ESTADOS_ALTA_EXITOSA:
             raise self._respuesta_inesperada(respuesta)
-        codigo = self._json(respuesta).get(CAMPO_CODIGO_ARTICULO)
+        articulo = self._json(respuesta).get(CAMPO_ARTICULO)
+        codigo = articulo.get(CAMPO_CODIGO_ARTICULO) if isinstance(articulo, dict) else None
         if not isinstance(codigo, str) or not codigo:
             raise self._respuesta_inesperada(respuesta)
         return codigo
