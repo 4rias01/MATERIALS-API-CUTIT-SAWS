@@ -55,6 +55,10 @@ def cuerpo(nombre: str = "Acero al carbono") -> dict[str, object]:
     return {"nombre": nombre, "categoria": "Materia Prima", "unidadMedida": "kg", "densidad": 7.85, "pureza": 98}
 
 
+def cambios(nombre: str = "Acero al carbono") -> dict[str, object]:
+    return {k: v for k, v in cuerpo(nombre).items() if k != "unidadMedida"}
+
+
 async def guardar(sesion: AsyncSession, numero: int, nombre: str) -> Material:
     """Prepara datos directamente en la base, sin pasar por la API (como profesorRepository.save)."""
     material = un_material(numero, nombre=nombre)
@@ -127,7 +131,7 @@ async def test_get_lista_los_materiales(cliente: httpx.AsyncClient, sesion: Asyn
     r = await cliente.get(URL)
 
     assert r.status_code == 200
-    assert [(m["materialId"], m["nombre"]) for m in r.json()] == [("mat-001", "Acero"), ("mat-002", "Cobre")]
+    assert [(m["materialId"], m["nombre"]) for m in r.json()["materiales"]] == [("mat-001", "Acero"), ("mat-002", "Cobre")]
 
 
 # ── Obtener por id ─────────────────────────────────────────────────────────────
@@ -146,12 +150,12 @@ async def test_get_por_id_inexistente_responde_404(cliente: httpx.AsyncClient) -
     r = await cliente.get(f"{URL}/mat-999")
 
     assert r.status_code == 404
-    assert r.json()["mensaje"] == "Material con id mat-999 no encontrado"
+    assert r.json()["mensaje"] == "El material solicitado con ID 'mat-999' no fue encontrado en el catálogo"
 
 
-async def test_get_con_id_no_valido_responde_400(cliente: httpx.AsyncClient) -> None:
+async def test_get_con_id_no_valido_responde_404(cliente: httpx.AsyncClient) -> None:
     for id_invalido in ("abc", "1", "mat-1"):
-        assert (await cliente.get(f"{URL}/{id_invalido}")).status_code == 400
+        assert (await cliente.get(f"{URL}/{id_invalido}")).status_code == 404
 
 
 # ── Actualizar ─────────────────────────────────────────────────────────────────
@@ -160,7 +164,7 @@ async def test_get_con_id_no_valido_responde_400(cliente: httpx.AsyncClient) -> 
 async def test_put_actualiza_material_y_responde_200(cliente: httpx.AsyncClient, sesion: AsyncSession) -> None:
     guardado = await guardar(sesion, 1, "Acero")
 
-    r = await cliente.put(f"{URL}/{guardado.id_material}", json=cuerpo("Acero actualizado"))
+    r = await cliente.put(f"{URL}/{guardado.id_material}", json=cambios("Acero actualizado"))
 
     assert r.status_code == 200
     datos = r.json()
@@ -169,7 +173,7 @@ async def test_put_actualiza_material_y_responde_200(cliente: httpx.AsyncClient,
 
 
 async def test_put_material_inexistente_responde_404(cliente: httpx.AsyncClient) -> None:
-    r = await cliente.put(f"{URL}/mat-999", json=cuerpo())
+    r = await cliente.put(f"{URL}/mat-999", json=cambios())
     assert r.status_code == 404
 
 
@@ -177,7 +181,7 @@ async def test_put_con_el_nombre_de_otro_material_responde_409(cliente: httpx.As
     await guardar(sesion, 1, "Acero")
     cobre = await guardar(sesion, 2, "Cobre")
 
-    r = await cliente.put(f"{URL}/{cobre.id_material}", json=cuerpo("acero"))
+    r = await cliente.put(f"{URL}/{cobre.id_material}", json=cambios("acero"))
     assert r.status_code == 409
 
 

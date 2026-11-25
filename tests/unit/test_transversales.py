@@ -69,7 +69,9 @@ def test_configurar_logging_no_duplica_el_manejador() -> None:
     assert not filtro.filter(duplicado)  # type: ignore[union-attr]
 
 
-@pytest.mark.parametrize(("valor", "valido"), [("abc12345", True), ("a" * 64, True), ("corto", False), ("con espacio 123", False), (None, False)])
+@pytest.mark.parametrize(
+    ("valor", "valido"), [("abc12345", True), ("a" * 64, True), ("corto", False), ("con espacio 123", False), (None, False)]
+)
 def test_trace_id_recibido_valido(valor: str | None, valido: bool) -> None:
     assert trace_id_valido(valor) is valido
 

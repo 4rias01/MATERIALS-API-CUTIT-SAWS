@@ -3,17 +3,16 @@
 API REST de la célula 1 de la plataforma backend de Cutit Saws (Desarrollo de Software II, 2026-2).
 Implementa el **DAS v1.2** del módulo y el **product backlog V1.3**.
 
-> **Estado: arquetipo + HU-01 (registrar material) + HU-05 (registrar fórmula) + CRUD básico de materiales.** La
-> infraestructura transversal funciona, **HU-01 está implementada de punta a punta** (es el
-> ejemplo de referencia para las demás historias, sección 4) y el resto de `/materiales`
-> (consultar, actualizar y eliminar) es el CRUD básico del dojo, que reemplazarán HU-02 a HU-04.
+El catálogo permite registrar materiales en Inventario (HU-01), consultar su ficha técnica
+y filtrar el listado en páginas de 10 materiales (HU-02). La HU-05 registra fórmulas en
+estado BORRADOR. El CRUD básico conserva la búsqueda por nombre, la actualización y la eliminación.
 
 | Funciona hoy | Pendiente |
 |---|---|
-| Arquitectura en capas, inyección de dependencias, configuración por variables de entorno | HU-02 a HU-04 y HU-06 a HU-11 (rutas, DTO, servicios, tablas, clientes y pruebas) |
+| Arquitectura en capas, inyección de dependencias, configuración por variables de entorno | HU-03 a HU-04 y HU-06 a HU-11 (rutas, DTO, servicios, tablas, clientes y pruebas) |
 | HU-05: `POST /formulas`, validación de componentes activos, registro en BORRADOR y ficha técnica | |
 | HU-01 completa: DTO con los mensajes del criterio 2, servicio, repositorio y alta en Inventario | Contrato POR ACORDAR con Inventario y Patent Sweep (sección 11) |
-| CRUD básico de materiales: listar, buscar por id o por nombre, actualizar y eliminar | |
+| CRUD básico de materiales: buscar por nombre, actualizar y eliminar | |
 | Modelos ORM y migraciones Alembic de `auditoria` y `material` | |
 | Unidad de trabajo (commit/rollback, timeout de 5 s), auditoría, eventos de dominio | |
 | Cliente HTTP base (timeout de 5 s, circuit breaker, traceId) y cliente de Inventario | |
@@ -107,9 +106,9 @@ y Prometheus y Grafana únicamente en `127.0.0.1`. En desarrollo PostgreSQL se p
 | Método y ruta | Origen | Respuesta |
 |---|---|---|
 | `POST /materiales` | **HU-01** | 201 con el material y el mensaje de c7 · 400 (mensaje de c2) · 409 nombre repetido en el catálogo (c3) o en Inventario (c5) · 503 Inventario no disponible (c6) · 500 base de datos (c8) |
-| `GET /materiales` | CRUD | 200 con la lista |
+| `GET /materiales` | HU-02 | 200 con página, totales y materiales; filtros opcionales por nombre, categoría, unidad y estado |
 | `GET /materiales/buscar?nombre=` | CRUD | 200 con los que contienen el texto (sin distinguir mayúsculas) |
-| `GET /materiales/{id}` | CRUD | 200 · 400 id sin formato `mat-NNN` · 404 si no existe |
+| `GET /materiales/{id}` | HU-02 | 200 con la ficha técnica de nueve campos · 404 si el ID no existe |
 | `PUT /materiales/{id}` | CRUD | 200 con el material actualizado · 404 · 409 nombre de otro material |
 | `DELETE /materiales/{id}` | CRUD | 204 · 404 |
 
@@ -237,10 +236,9 @@ El manejador global responde 400 con ese texto y el traceId.
 
 ```python
 class MaterialService(ServicioBase):
-    @operacion_de_negocio("REGISTRAR_MATERIAL", "material", mensaje_error_bd=mensajes.HU01_C8,
-                          mensaje_servicio_externo=mensajes.HU01_C6)
+    @operacion_de_negocio("REGISTRAR_MATERIAL", "material", mensaje_error_bd=mensajes.HU01_C8, mensaje_servicio_externo=mensajes.HU01_C6)
     async def registrar(self, comando: RegistrarMaterialComando) -> Resultado[Material]:
-        async with self._uow:                                   # Unit of Work: una transacción
+        async with self._uow:  # Unit of Work: una transacción
             if await self._materiales.existe_nombre(comando.nombre):
                 raise ConflictoError(formatear(mensajes.HU01_C3, Nombre=comando.nombre))
         ...

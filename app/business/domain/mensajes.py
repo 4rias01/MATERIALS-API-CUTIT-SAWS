@@ -49,10 +49,7 @@ HU01_C3 = "El material con el nombre '[Nombre]' ya se encuentra registrado en el
 # c5 · texto que responde Inventario (no lo devuelve esta API) · marcadores: [Nombre]
 HU01_C5_RESPUESTA_INVENTARIO = "Ya existe un artículo con el nombre [Nombre]"
 # c5 · 409 · marcadores: [Nombre]
-HU01_C5 = (
-    "Inventario ya tiene registrado un artículo con el nombre '[Nombre]'. Indique un nombre "
-    "diferente para el material."
-)
+HU01_C5 = "Inventario ya tiene registrado un artículo con el nombre '[Nombre]'. Indique un nombre diferente para el material."
 # c6 · 503
 HU01_C6 = "Error de comunicación con el módulo Inventario al registrar el material. Por favor reintente más tarde"
 # c7 · 201 · marcadores: [Nombre], [SKU]
@@ -61,18 +58,20 @@ HU01_C7 = "Material '[Nombre]' registrado exitosamente con el SKU [SKU]."
 HU01_C8 = "Error interno de conexión con la base de datos. Por favor reintente más tarde"
 
 
+# HU-02 · Consultar materiales
+HU02_C3 = "El valor del filtro de búsqueda '[NombreParametro]' es inválido. Por favor verifique los valores o tipos de datos ingresados."
+HU02_C4 = "El material solicitado con ID '[IDIngresado]' no fue encontrado en el catálogo"
+HU02_C5 = "Error de comunicación con la base de datos al consultar el material. TraceID: [traceId]"
+HU02_C7 = "No se encontraron materiales que coincidan con los criterios indicados"
+
+
 # HU-05 · Registrar fórmula --------------------------------------------------------------
 HU05_C2_1 = "El campo 'Nombre' es obligatorio. Por favor, ingréselo e intente nuevamente."
 HU05_C2_2 = "El campo 'Aplicación técnica' es obligatorio. Por favor, ingréselo e intente nuevamente."
-HU05_C2_3 = (
-    "La fórmula debe estar compuesta por mínimo 2 materiales diferentes. "
-    "Por favor, agregue los componentes e intente nuevamente."
-)
+HU05_C2_3 = "La fórmula debe estar compuesta por mínimo 2 materiales diferentes. Por favor, agregue los componentes e intente nuevamente."
 HU05_C2_4 = "El campo 'Cantidad' del material '[IDMaterial]' es obligatorio. Por favor, ingréselo e intente nuevamente."
 HU05_C3_1 = "La cantidad del material '[IDMaterial]' debe ser un número mayor que 0. Valor recibido: [Cantidad]."
-HU05_C3_2 = (
-    "La cantidad del material '[IDMaterial]' admite máximo 6 dígitos enteros y 3 decimales. Valor recibido: [Cantidad]."
-)
+HU05_C3_2 = "La cantidad del material '[IDMaterial]' admite máximo 6 dígitos enteros y 3 decimales. Valor recibido: [Cantidad]."
 HU05_C4_1 = "La fórmula no puede registrarse. Los siguientes componentes no existen: [Lista de Materiales]."
 HU05_C4_2 = "La fórmula no puede registrarse. Los siguientes componentes están en estado INACTIVO: [Lista de Materiales]."
 HU05_C5 = (
@@ -111,10 +110,7 @@ HU03_C2_8 = "El campo 'ID' es de solo lectura y no puede ser modificado."
 # c3 · 409 · marcadores: [Nombre]
 HU03_C3 = "El material con el nombre '[Nombre]' ya se encuentra registrado en el catálogo"
 # c5 · 409 · marcadores: [Nombre]
-HU03_C5 = (
-    "Inventario ya tiene registrado un artículo con el nombre '[Nombre]'. Indique un nombre "
-    "diferente para el material"
-)
+HU03_C5 = "Inventario ya tiene registrado un artículo con el nombre '[Nombre]'. Indique un nombre diferente para el material"
 # c6 · 503
 HU03_C6 = "Error de comunicación con el módulo Inventario al actualizar el material. Por favor reintente más tarde"
 # c7 · 200 · marcadores: [Nombre]
@@ -122,10 +118,7 @@ HU03_C7 = "Material '[Nombre]' actualizado exitosamente"
 # c8 · 404 · marcadores: [id_material]
 HU03_C8 = "El material solicitado con ID '[id_material]' no fue encontrado en el catálogo"
 # c9 · 409
-HU03_C9 = (
-    "No se pueden modificar materiales en estado INACTIVO. Debe reactivar el material antes "
-    "de editar sus propiedades"
-)
+HU03_C9 = "No se pueden modificar materiales en estado INACTIVO. Debe reactivar el material antes de editar sus propiedades"
 # c10 · 500
 HU03_C10 = "Error interno al actualizar el material. La transacción fue cancelada"
 

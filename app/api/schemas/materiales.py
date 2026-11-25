@@ -4,16 +4,22 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any, ClassVar, Self
 
-from pydantic import Field, field_validator
+from pydantic import AliasChoices, Field, field_validator
 from pydantic_core import ErrorDetails
 
-
-from app.api.schemas.comun import DecimalEntrada, DecimalSalida, EsquemaEntrada, EsquemaSalida, error_de_negocio
+from app.api.schemas.comun import (
+    DecimalEntrada,
+    DecimalSalida,
+    EsquemaEntrada,
+    EsquemaSalida,
+    error_de_negocio,
+)
 from app.business.domain import mensajes
 from app.business.domain.enums import Categoria, EstadoMaterial, UnidadMedida
 from app.business.domain.errores import Motivo, ValorInvalidoError
 from app.business.domain.value_objects import Densidad, NombreMaterial, Pureza, normalizar_nombre
-from app.business.services.comandos import DatosMaterial, RegistrarMaterialComando, ActualizarMaterialComando
+from app.business.services.comandos import ActualizarMaterialComando, RegistrarMaterialComando
+from app.business.services.material_service import FiltrosMaterial
 
 # ---------------------------------------------------------------------------------------
 # Entrada
@@ -109,13 +115,13 @@ class MaterialCrearSolicitud(EsquemaEntrada):
 
 # c2.1, c2.2 y c2.8: los tres campos de solo lectura con mensaje propio.
 _MENSAJES_CAMPO_SOLO_LECTURA: dict[str, str] = {
-    "id":            mensajes.HU03_C2_8,
-    "materialId":    mensajes.HU03_C2_8,
-    "material_id":   mensajes.HU03_C2_8,
-    "idMaterial":    mensajes.HU03_C2_8,
-    "id_material":   mensajes.HU03_C2_8,
-    "sku":           mensajes.HU03_C2_1,
-    "unidadMedida":  mensajes.HU03_C2_2,
+    "id": mensajes.HU03_C2_8,
+    "materialId": mensajes.HU03_C2_8,
+    "material_id": mensajes.HU03_C2_8,
+    "idMaterial": mensajes.HU03_C2_8,
+    "id_material": mensajes.HU03_C2_8,
+    "sku": mensajes.HU03_C2_1,
+    "unidadMedida": mensajes.HU03_C2_2,
     "unidad_medida": mensajes.HU03_C2_2,
 }
 
@@ -129,12 +135,12 @@ class MaterialActualizarSolicitud(EsquemaEntrada):
     """
 
     mensajes_error: ClassVar[dict[tuple[str, str], str]] = {
-        ("nombre", "missing"):    mensajes.HU03_C2_3,
-        ("nombre", "*"):          mensajes.HU03_C2_3,   # defensivo
-        ("densidad", "missing"):  mensajes.HU03_C2_6,
-        ("densidad", "*"):        mensajes.HU03_C2_6,
-        ("pureza", "missing"):    mensajes.HU03_C2_7,
-        ("pureza", "*"):          mensajes.HU03_C2_7,
+        ("nombre", "missing"): mensajes.HU03_C2_3,
+        ("nombre", "*"): mensajes.HU03_C2_3,  # defensivo
+        ("densidad", "missing"): mensajes.HU03_C2_6,
+        ("densidad", "*"): mensajes.HU03_C2_6,
+        ("pureza", "missing"): mensajes.HU03_C2_7,
+        ("pureza", "*"): mensajes.HU03_C2_7,
     }
 
     nombre: str = Field(
@@ -183,7 +189,7 @@ class MaterialActualizarSolicitud(EsquemaEntrada):
         # c2.1 / c2.2 / c2.8: campos de solo lectura enviados en el cuerpo.
         if error["type"] == "extra_forbidden":
             campo = error["loc"][0] if error["loc"] else ""
-            mensaje = _MENSAJES_CAMPO_SOLO_LECTURA.get(campo)
+            mensaje = _MENSAJES_CAMPO_SOLO_LECTURA.get(campo) if isinstance(campo, str) else None
             if mensaje is not None:
                 return mensaje
             return super().mensaje_para_error(error, datos)
@@ -206,15 +212,37 @@ class MaterialActualizarSolicitud(EsquemaEntrada):
         )
 
 
+class ConsultaMaterial(EsquemaEntrada):
+    nombre: str | None = Field(default=None, max_length=100)
+    categoria: Categoria | None = None
+    unidad_medida: UnidadMedida | None = None
+    estado: EstadoMaterial | None = None
+    pagina: int = Field(default=1, ge=1)
+
+    @classmethod
+    def mensaje_para_error(cls, error: ErrorDetails, datos: Any) -> str:
+        return mensajes.formatear(mensajes.HU02_C3, NombreParametro=error["loc"][0])
+
+    @field_validator("pagina", mode="before")
+    @classmethod
+    def validar_entero(cls, valor: Any) -> Any:
+        if isinstance(valor, str) and not valor.removeprefix("+").isdigit():
+            raise ValueError("Página inválida")
+        return valor
+
+    def a_filtros(self) -> FiltrosMaterial:
+        return FiltrosMaterial(self.nombre, self.categoria, self.unidad_medida, self.estado)
+
+
 # ---------------------------------------------------------------------------------------
 # Salida
 # ---------------------------------------------------------------------------------------
 
 
-class MaterialRespuesta(EsquemaSalida):
-    """Material del catálogo (GET y PUT del CRUD básico)."""
+class FichaMaterial(EsquemaSalida):
+    """Los nueve campos de la ficha técnica (HU-02)."""
 
-    material_id: str = Field(examples=["mat-001"])
+    material_id: str = Field(validation_alias=AliasChoices("materialId", "id_material"), examples=["mat-001"])
     sku: str = Field(examples=["MP-00001"])
     nombre: str = Field(examples=["Acero al carbono 1045"])
     categoria: Categoria
@@ -223,6 +251,22 @@ class MaterialRespuesta(EsquemaSalida):
     pureza: DecimalSalida = Field(examples=[98])
     fecha_registro: datetime
     estado: EstadoMaterial
+
+    @classmethod
+    def de_material(cls, material: Any) -> Self:
+        return cls.model_validate(material, from_attributes=True)
+
+
+class ListaMateriales(EsquemaSalida):
+    pagina: int
+    tamano_pagina: int
+    total_registros: int
+    total_paginas: int
+    materiales: list[FichaMaterial]
+    mensaje: str | None = None
+
+
+class MaterialRespuesta(FichaMaterial):
     fecha_ultima_actualizacion: datetime
 
     @classmethod
@@ -241,6 +285,7 @@ class MaterialRegistradoRespuesta(MaterialRespuesta):
     def con_mensaje(cls, material: Any, mensaje: str) -> Self:
         return cls(**_campos(material), mensaje=mensaje)
 
+
 class MaterialActualizadoRespuesta(MaterialRespuesta):
     """Material actualizado y mensaje (HU-03 c7: 200)."""
 
@@ -249,6 +294,7 @@ class MaterialActualizadoRespuesta(MaterialRespuesta):
     @classmethod
     def con_mensaje(cls, material: Any, mensaje: str) -> Self:
         return cls(**_campos(material), mensaje=mensaje)
+
 
 def _campos(material: Any) -> dict[str, Any]:
     return {

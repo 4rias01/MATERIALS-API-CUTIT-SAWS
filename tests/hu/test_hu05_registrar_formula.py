@@ -35,9 +35,14 @@ class Escenario:
     uow: UnitOfWorkFalsa = field(default_factory=UnitOfWorkFalsa)
     auditoria: AuditoriaRepositoryFalso = field(default_factory=AuditoriaRepositoryFalso)
     formulas: FormulaRepositoryFalso = field(default_factory=FormulaRepositoryFalso)
-    materiales: MaterialRepositoryFalso = field(default_factory=lambda: MaterialRepositoryFalso([
-        un_material(1, nombre="Acero", unidad_medida="kg"), un_material(2, nombre="Tornillo", unidad_medida="und"),
-    ]))
+    materiales: MaterialRepositoryFalso = field(
+        default_factory=lambda: MaterialRepositoryFalso(
+            [
+                un_material(1, nombre="Acero", unidad_medida="kg"),
+                un_material(2, nombre="Tornillo", unidad_medida="und"),
+            ]
+        )
+    )
     eventos: list[EventoDominio] = field(default_factory=list)
 
     def servicio(self) -> FormulaService:
@@ -69,8 +74,11 @@ async def test_c01_c06_c07_registra_ficha_tecnica_y_auditoria(cliente: httpx.Asy
     assert antes <= fecha <= datetime.now(UTC)
     assert actualizacion == fecha and fecha.utcoffset().total_seconds() == 0
     assert datos == {
-        "formulaId": "form-001", "nombre": VALIDO["nombre"], "aplicacionTecnica": VALIDO["aplicacionTecnica"],
-        "version": 1, "estado": "BORRADOR",
+        "formulaId": "form-001",
+        "nombre": VALIDO["nombre"],
+        "aplicacionTecnica": VALIDO["aplicacionTecnica"],
+        "version": 1,
+        "estado": "BORRADOR",
         "componentes": [
             {"sku": "MP-00001", "nombre": "Acero", "cantidad": 2.125, "unidadMedida": "kg"},
             {"sku": "MP-00002", "nombre": "Tornillo", "cantidad": 3, "unidadMedida": "und"},
@@ -84,23 +92,33 @@ async def test_c01_c06_c07_registra_ficha_tecnica_y_auditoria(cliente: httpx.Asy
     assert [(e.nombre, dict(e.datos)) for e in escenario.eventos] == [("FormulaRegistrada", {"formulaId": "form-001"})]
 
 
-@pytest.mark.parametrize("cambios,mensaje", [
-    ({"nombre": ...}, mensajes.HU05_C2_1), ({"nombre": None}, mensajes.HU05_C2_1),
-    ({"nombre": "   "}, mensajes.HU05_C2_1),
-    ({"aplicacionTecnica": ...}, mensajes.HU05_C2_2), ({"aplicacionTecnica": None}, mensajes.HU05_C2_2),
-    ({"aplicacionTecnica": " "}, mensajes.HU05_C2_2),
-    ({"componentes": ...}, mensajes.HU05_C2_3), ({"componentes": None}, mensajes.HU05_C2_3),
-    ({"componentes": []}, mensajes.HU05_C2_3),
-    ({"componentes": [{"materialId": "mat-001", "cantidad": 1}]}, mensajes.HU05_C2_3),
-    ({"componentes": [{"materialId": "mat-001"}, {"materialId": "mat-002", "cantidad": 1}]},
-     formatear(mensajes.HU05_C2_4, IDMaterial="mat-001")),
-    ({"nombre": "X" * 81}, mensajes.HU05_C9_1_A), ({"nombre": "Mezcla 1"}, mensajes.HU05_C9_1_B),
-    ({"nombre": 123}, mensajes.HU05_C9_1_B), ({"nombre": "Mezcla!"}, mensajes.HU05_C9_1_B),
-    ({"aplicacionTecnica": "A" * 201}, mensajes.HU05_C9_2),
-    ({"aplicacionTecnica": "Corte!"}, mensajes.SOLICITUD_INVALIDA),
-    ({"aplicacionTecnica": 123}, mensajes.SOLICITUD_INVALIDA),
-    ({"componentes": [{"materialId": "mat-001", "cantidad": 1}] * 2}, formatear(mensajes.HU05_C9_3, IDMaterial="mat-001")),
-])
+@pytest.mark.parametrize(
+    "cambios,mensaje",
+    [
+        ({"nombre": ...}, mensajes.HU05_C2_1),
+        ({"nombre": None}, mensajes.HU05_C2_1),
+        ({"nombre": "   "}, mensajes.HU05_C2_1),
+        ({"aplicacionTecnica": ...}, mensajes.HU05_C2_2),
+        ({"aplicacionTecnica": None}, mensajes.HU05_C2_2),
+        ({"aplicacionTecnica": " "}, mensajes.HU05_C2_2),
+        ({"componentes": ...}, mensajes.HU05_C2_3),
+        ({"componentes": None}, mensajes.HU05_C2_3),
+        ({"componentes": []}, mensajes.HU05_C2_3),
+        ({"componentes": [{"materialId": "mat-001", "cantidad": 1}]}, mensajes.HU05_C2_3),
+        (
+            {"componentes": [{"materialId": "mat-001"}, {"materialId": "mat-002", "cantidad": 1}]},
+            formatear(mensajes.HU05_C2_4, IDMaterial="mat-001"),
+        ),
+        ({"nombre": "X" * 81}, mensajes.HU05_C9_1_A),
+        ({"nombre": "Mezcla 1"}, mensajes.HU05_C9_1_B),
+        ({"nombre": 123}, mensajes.HU05_C9_1_B),
+        ({"nombre": "Mezcla!"}, mensajes.HU05_C9_1_B),
+        ({"aplicacionTecnica": "A" * 201}, mensajes.HU05_C9_2),
+        ({"aplicacionTecnica": "Corte!"}, mensajes.SOLICITUD_INVALIDA),
+        ({"aplicacionTecnica": 123}, mensajes.SOLICITUD_INVALIDA),
+        ({"componentes": [{"materialId": "mat-001", "cantidad": 1}] * 2}, formatear(mensajes.HU05_C9_3, IDMaterial="mat-001")),
+    ],
+)
 async def test_c02_c09_rechaza_datos_invalidos_sin_guardar(
     cliente: httpx.AsyncClient, escenario: Escenario, cambios: dict[str, Any], mensaje: str
 ) -> None:
@@ -110,17 +128,24 @@ async def test_c02_c09_rechaza_datos_invalidos_sin_guardar(
     assert escenario.uow.confirmaciones == 0
 
 
-@pytest.mark.parametrize("valor,plantilla", [
-    (None, mensajes.HU05_C2_4), (0, mensajes.HU05_C3_1), (-1, mensajes.HU05_C3_1),
-    (True, mensajes.HU05_C3_1), ("abc", mensajes.HU05_C3_1), ("NaN", mensajes.HU05_C3_1),
-    ("Infinity", mensajes.HU05_C3_1), (1000000, mensajes.HU05_C3_2), (0.0001, mensajes.HU05_C3_2),
-    ("999999.9999", mensajes.HU05_C3_2),
-    ("1.00000000000000000000000000001", mensajes.HU05_C3_2),
-    ("1e-1000000000000000000", mensajes.HU05_C3_2),
-])
-async def test_c02_c03_cantidad_invalida(
-    cliente: httpx.AsyncClient, escenario: Escenario, valor: Any, plantilla: str
-) -> None:
+@pytest.mark.parametrize(
+    "valor,plantilla",
+    [
+        (None, mensajes.HU05_C2_4),
+        (0, mensajes.HU05_C3_1),
+        (-1, mensajes.HU05_C3_1),
+        (True, mensajes.HU05_C3_1),
+        ("abc", mensajes.HU05_C3_1),
+        ("NaN", mensajes.HU05_C3_1),
+        ("Infinity", mensajes.HU05_C3_1),
+        (1000000, mensajes.HU05_C3_2),
+        (0.0001, mensajes.HU05_C3_2),
+        ("999999.9999", mensajes.HU05_C3_2),
+        ("1.00000000000000000000000000001", mensajes.HU05_C3_2),
+        ("1e-1000000000000000000", mensajes.HU05_C3_2),
+    ],
+)
+async def test_c02_c03_cantidad_invalida(cliente: httpx.AsyncClient, escenario: Escenario, valor: Any, plantilla: str) -> None:
     cuerpo = _cuerpo()
     cuerpo["componentes"][0]["cantidad"] = valor
     r = await cliente.post("/formulas", json=cuerpo)
@@ -137,9 +162,7 @@ async def test_c01_c03_limites_de_cantidad_validos(cliente: httpx.AsyncClient, e
 
 
 @pytest.mark.parametrize("estado,plantilla", [(None, mensajes.HU05_C4_1), ("INACTIVO", mensajes.HU05_C4_2)])
-async def test_c04_componentes_no_disponibles(
-    cliente: httpx.AsyncClient, escenario: Escenario, estado: str | None, plantilla: str
-) -> None:
+async def test_c04_componentes_no_disponibles(cliente: httpx.AsyncClient, escenario: Escenario, estado: str | None, plantilla: str) -> None:
     for material in escenario.materiales.materiales.values():
         material.estado = estado or "ACTIVO"
     if estado is None:
@@ -181,15 +204,22 @@ async def test_c01_unidad_se_toma_del_catalogo(cliente: httpx.AsyncClient, escen
     assert r.json()["componentes"][0]["unidadMedida"] == unidad
 
 
-@pytest.mark.parametrize("error,codigo,plantilla", [
-    (ErrorBaseDatos("conexión"), 500, mensajes.HU05_C8),
-    (ErrorBaseDatos("timeout > 5 s"), 500, mensajes.HU05_C8),
-    (ErrorIntegridadDatos("nombre duplicado", "uq_formula_nombre_lower"), 409, mensajes.HU05_C6_1),
-    (ErrorIntegridadDatos("otra restricción", "otra"), 500, mensajes.HU05_C8),
-])
+@pytest.mark.parametrize(
+    "error,codigo,plantilla",
+    [
+        (ErrorBaseDatos("conexión"), 500, mensajes.HU05_C8),
+        (ErrorBaseDatos("timeout > 5 s"), 500, mensajes.HU05_C8),
+        (ErrorIntegridadDatos("nombre duplicado", "uq_formula_nombre_lower"), 409, mensajes.HU05_C6_1),
+        (ErrorIntegridadDatos("otra restricción", "otra"), 500, mensajes.HU05_C8),
+    ],
+)
 async def test_c06_c08_fallo_en_commit_no_publica_eventos(
-    cliente: httpx.AsyncClient, escenario: Escenario, caplog: pytest.LogCaptureFixture,
-    error: ErrorBaseDatos, codigo: int, plantilla: str,
+    cliente: httpx.AsyncClient,
+    escenario: Escenario,
+    caplog: pytest.LogCaptureFixture,
+    error: ErrorBaseDatos,
+    codigo: int,
+    plantilla: str,
 ) -> None:
     escenario.uow.error_en_commit = error
     with caplog.at_level(logging.ERROR):
