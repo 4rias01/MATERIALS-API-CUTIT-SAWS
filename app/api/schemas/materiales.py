@@ -4,7 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any, ClassVar, Self
 
-from pydantic import AliasChoices, Field, field_validator
+from pydantic import AliasChoices, Field, field_validator, model_validator
 from pydantic_core import ErrorDetails
 
 from app.api.schemas.comun import (
@@ -113,16 +113,12 @@ class MaterialCrearSolicitud(EsquemaEntrada):
 # HU-03 · PUT /materiales/{id}
 # ---------------------------------------------------------------------------------------
 
-# c2.1, c2.2 y c2.8: los tres campos de solo lectura con mensaje propio.
 _MENSAJES_CAMPO_SOLO_LECTURA: dict[str, str] = {
-    "id": mensajes.HU03_C2_8,
-    "materialId": mensajes.HU03_C2_8,
-    "material_id": mensajes.HU03_C2_8,
-    "idMaterial": mensajes.HU03_C2_8,
-    "id_material": mensajes.HU03_C2_8,
+    "ID": mensajes.HU03_C2_8,
+    "SKU": mensajes.HU03_C2_1,
     "sku": mensajes.HU03_C2_1,
+    "Unidad de medida": mensajes.HU03_C2_2,
     "unidadMedida": mensajes.HU03_C2_2,
-    "unidad_medida": mensajes.HU03_C2_2,
 }
 
 
@@ -136,10 +132,9 @@ class MaterialActualizarSolicitud(EsquemaEntrada):
 
     mensajes_error: ClassVar[dict[tuple[str, str], str]] = {
         ("nombre", "missing"): mensajes.HU03_C2_3,
-        ("nombre", "*"): mensajes.HU03_C2_3,  # defensivo
-        ("densidad", "missing"): mensajes.HU03_C2_6,
+        ("nombre", "*"): mensajes.HU03_C2_4_B,
+        ("categoria", "*"): mensajes.HU03_C2_5,
         ("densidad", "*"): mensajes.HU03_C2_6,
-        ("pureza", "missing"): mensajes.HU03_C2_7,
         ("pureza", "*"): mensajes.HU03_C2_7,
     }
 
@@ -152,13 +147,23 @@ class MaterialActualizarSolicitud(EsquemaEntrada):
     densidad: DecimalEntrada = Field(examples=[7.85])
     pureza: DecimalEntrada = Field(examples=[98])
 
+    @model_validator(mode="before")
+    @classmethod
+    def _rechazar_campos_solo_lectura(cls, datos: Any) -> Any:
+        if isinstance(datos, dict):
+            for campo, mensaje in _MENSAJES_CAMPO_SOLO_LECTURA.items():
+                if campo in datos:
+                    raise error_de_negocio(mensaje)
+        return datos
+
     @field_validator("nombre")
     @classmethod
     def _validar_nombre(cls, valor: str) -> str:
-        if not normalizar_nombre(valor):
+        nombre = normalizar_nombre(valor)
+        if not nombre:
             raise error_de_negocio(mensajes.HU03_C2_3)
         try:
-            return NombreMaterial.crear(valor).valor
+            return NombreMaterial(nombre).valor
         except ValorInvalidoError as exc:
             mensaje = mensajes.HU03_C2_4_A if exc.motivo == Motivo.LONGITUD else mensajes.HU03_C2_4_B
             raise error_de_negocio(mensaje) from None
@@ -181,26 +186,9 @@ class MaterialActualizarSolicitud(EsquemaEntrada):
 
     @classmethod
     def mensaje_para_error(cls, error: ErrorDetails, datos: Any) -> str | None:
-        # Igual que en HU-01: un ``null`` cuenta como "obligatorio".
-        if error["type"] != "missing" and error.get("input", ...) is None:
+        if error.get("input", ...) is None:
             error = error.copy()
             error["type"] = "missing"
-
-        # c2.1 / c2.2 / c2.8: campos de solo lectura enviados en el cuerpo.
-        if error["type"] == "extra_forbidden":
-            campo = error["loc"][0] if error["loc"] else ""
-            mensaje = _MENSAJES_CAMPO_SOLO_LECTURA.get(campo) if isinstance(campo, str) else None
-            if mensaje is not None:
-                return mensaje
-            return super().mensaje_para_error(error, datos)
-
-        # c2.5: formateamos explícitamente ``[valor]`` (cubre "omitido" y "valor inválido").
-        if error["loc"] and error["loc"][0] == "categoria":
-            valor = error.get("input")
-            if valor is None:
-                valor = ""
-            return mensajes.formatear(mensajes.HU03_C2_5, valor=valor)
-
         return super().mensaje_para_error(error, datos)
 
     def a_comando(self) -> ActualizarMaterialComando:

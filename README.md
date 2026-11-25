@@ -4,15 +4,16 @@ API REST de la célula 1 de la plataforma backend de Cutit Saws (Desarrollo de S
 Implementa el **DAS v1.2** del módulo y el **product backlog V1.3**.
 
 El catálogo permite registrar materiales en Inventario (HU-01), consultar su ficha técnica
-y filtrar el listado en páginas de 10 materiales (HU-02). La HU-05 registra fórmulas en
-estado BORRADOR. El CRUD básico conserva la búsqueda por nombre, la actualización y la eliminación.
+y filtrar el listado en páginas de 10 materiales (HU-02). La HU-03 permite modificar las
+propiedades de un material activo y sincroniza los cambios de nombre con Inventario.
+La HU-05 registra fórmulas en estado BORRADOR. El CRUD básico conserva la búsqueda por nombre y la eliminación.
 
 | Funciona hoy | Pendiente |
 |---|---|
-| Arquitectura en capas, inyección de dependencias, configuración por variables de entorno | HU-03 a HU-04 y HU-06 a HU-11 (rutas, DTO, servicios, tablas, clientes y pruebas) |
+| Arquitectura en capas, inyección de dependencias, configuración por variables de entorno | HU-04 y HU-06 a HU-11 (rutas, DTO, servicios, tablas, clientes y pruebas) |
 | HU-05: `POST /formulas`, validación de componentes activos, registro en BORRADOR y ficha técnica | |
 | HU-01 completa: DTO con los mensajes del criterio 2, servicio, repositorio y alta en Inventario | Contrato POR ACORDAR con Inventario y Patent Sweep (sección 11) |
-| CRUD básico de materiales: buscar por nombre, actualizar y eliminar | |
+| HU-03, modificación de materiales activos. CRUD básico de búsqueda por nombre y eliminación | |
 | Modelos ORM y migraciones Alembic de `auditoria` y `material` | |
 | Unidad de trabajo (commit/rollback, timeout de 5 s), auditoría, eventos de dominio | |
 | Cliente HTTP base (timeout de 5 s, circuit breaker, traceId) y cliente de Inventario | |
@@ -109,13 +110,16 @@ y Prometheus y Grafana únicamente en `127.0.0.1`. En desarrollo PostgreSQL se p
 | `GET /materiales` | HU-02 | 200 con página, totales y materiales; filtros opcionales por nombre, categoría, unidad y estado |
 | `GET /materiales/buscar?nombre=` | CRUD | 200 con los que contienen el texto (sin distinguir mayúsculas) |
 | `GET /materiales/{id}` | HU-02 | 200 con la ficha técnica de nueve campos · 404 si el ID no existe |
-| `PUT /materiales/{id}` | CRUD | 200 con el material actualizado · 404 · 409 nombre de otro material |
+| `PUT /materiales/{id}` | HU-03 | 200 con el material actualizado y el mensaje · 400 datos inválidos · 404 ID inexistente · 409 material inactivo o nombre duplicado · 503 fallo de Inventario · 500 fallo de base de datos |
 | `DELETE /materiales/{id}` | CRUD | 204 · 404 |
 
-Cuerpo de POST y PUT: `{"nombre", "categoria", "unidadMedida", "densidad", "pureza"}`. El ID
-(`mat-NNN`), el SKU (lo asigna Inventario) y el estado (`ACTIVO` al registrar) son de solo
-lectura: cualquier campo extra se rechaza con 400. El material se devuelve con `materialId`,
-`sku`, los cinco campos, `estado`, `fechaRegistro` y `fechaUltimaActualizacion`.
+El POST recibe `nombre`, `categoria`, `unidadMedida`, `densidad` y `pureza`. Para editar,
+consulta los valores actuales con `GET /materiales/{id}` y envía los cuatro campos obligatorios
+`nombre`, `categoria`, `densidad` y `pureza` en el PUT. El ID, el SKU y la unidad de medida
+son de solo lectura durante la edición. El material se identifica en la ruta, por ejemplo
+`PUT /materiales/mat-001`. Enviar `ID` en el cuerpo devuelve 400 con el mensaje del criterio 2.8.
+Un cambio de nombre, incluso solo de mayúsculas,
+requiere confirmación de `PATCH /inventario/articulos/{codigo}`, donde `codigo` es el SKU.
 
 Ejemplo de HU-01 (Inventario debe estar configurado en `INVENTARIO_URL`; si no, responde 503):
 

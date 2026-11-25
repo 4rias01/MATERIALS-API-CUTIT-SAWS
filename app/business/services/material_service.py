@@ -3,9 +3,8 @@
 * HU-01 (registrar material): POST /materiales. Recorre las tres capas (router →
   servicio → repositorio y cliente de Inventario) y sirve de modelo para las siguientes
   historias de usuario.
-* CRUD básico (equivalente al ``ProfesorService`` del dojo de Java): actualizar,
-  eliminar, listar, obtener por id y buscar por nombre. Las HU-02 a HU-04 los
-  reemplazarán con sus propios criterios.
+* HU-02 y HU-03: consultar la ficha técnica, listar y modificar materiales activos.
+* CRUD básico: eliminar y buscar por nombre.
 
 Cada método usa la infraestructura del arquetipo: unidad de trabajo, auditoría de las
 escrituras y eventos de dominio.
@@ -145,8 +144,6 @@ class MaterialService(ServicioBase):
             raise
         return material
 
-    # --- CRUD básico: escrituras (se auditan) ----------------------------------------
-
     # --- HU-03 · Modificar material --------------------------------------------------
 
     @operacion_de_negocio(
@@ -159,48 +156,31 @@ class MaterialService(ServicioBase):
     async def actualizar(self, id_material: str, comando: ActualizarMaterialComando) -> Resultado[Material]:
         """HU-03 · PUT /materiales/{id} → 200 con el material actualizado y ``HU03_C7``."""
         nombre = normalizar_nombre(comando.nombre)
-        mensaje_404 = formatear(mensajes.HU03_C8, id_material=id_material)  # c8
-
-        # --- Fase 1: validaciones (solo lectura)
-        async with self._uow:
-            material = await self._obtener_o_404(id_material, mensaje_404)  # c8
-            if material.estado != EstadoMaterial.ACTIVO.value:  # c9
-                raise ConflictoError(mensajes.HU03_C9)
-            if await self._materiales.existe_nombre(nombre, excluir_id=id_material):  # c3
-                raise _nombre_duplicado_hu03(nombre)
-            sku = material.sku
-            nombre_cambio = material.nombre != nombre  # c4
-
-        # --- Fase 2: sincronización con Inventario (solo si el Nombre cambió)
-        if nombre_cambio:
-            await self._actualizar_en_inventario(sku, nombre)  # c4/c5/c6
-
-        # --- Fase 3: persistencia atómica
+        sku_sincronizado = None
         try:
             async with self._uow:
-                material = await self._obtener_o_404(id_material, mensaje_404)  # c8
-                if material.estado != EstadoMaterial.ACTIVO.value:  # c9 (concurrencia)
+                material = await self._materiales.obtener_por_id(id_material, para_actualizar=True)
+                if material is None:
+                    raise RecursoNoEncontradoError(formatear(mensajes.HU03_C8, id_material=id_material))
+                if material.estado != EstadoMaterial.ACTIVO.value:
                     raise ConflictoError(mensajes.HU03_C9)
-                material.nombre = nombre
+                if material.nombre != nombre:
+                    if await self._materiales.existe_nombre(nombre, excluir_id=id_material):
+                        raise _nombre_duplicado_hu03(nombre)
+                    await self._actualizar_en_inventario(material.sku, nombre)
+                    sku_sincronizado = material.sku
+                    material.nombre = nombre
                 material.categoria = comando.categoria
                 material.densidad = comando.densidad
                 material.pureza = comando.pureza
-                material.fecha_actualizacion = ahora()  # c7
-                self._auditar(OPERACION_ACTUALIZAR, RECURSO, id_material, 200, {"sku": sku})
+                material.fecha_actualizacion = ahora()
+                self._auditar(OPERACION_ACTUALIZAR, RECURSO, id_material, 200, {"sku": material.sku})
                 await self._uow.commit()
-        except ErrorIntegridadDatos as exc:
-            if exc.restriccion != RESTRICCION_NOMBRE_UNICO:
-                _registrar_fallo_al_actualizar(sku, nombre)
-                raise
-            logger.warning(
-                "Nombre registrado por una petición simultánea; Inventario ya tiene %r para el SKU %s",
-                nombre,
-                sku,
-                extra={"sku": sku, "nombre": nombre},
-            )
-            raise _nombre_duplicado_hu03(nombre) from exc
-        except ErrorBaseDatos:
-            _registrar_fallo_al_actualizar(sku, nombre)
+        except ErrorBaseDatos as exc:
+            if sku_sincronizado is not None:
+                _registrar_fallo_al_actualizar(sku_sincronizado, nombre)
+            if isinstance(exc, ErrorIntegridadDatos) and exc.restriccion == RESTRICCION_NOMBRE_UNICO:
+                raise _nombre_duplicado_hu03(nombre) from exc
             raise
 
         self._publicar(TipoEvento.MATERIAL_ACTUALIZADO, materialId=id_material)
@@ -257,12 +237,10 @@ class MaterialService(ServicioBase):
 
     # --- Auxiliares --------------------------------------------------------------------
 
-    async def _obtener_o_404(self, id_material: str, mensaje: str | None = None) -> Material:
-        """Devuelve el material o lanza 404. ``mensaje`` permite que cada HU use su texto
-        literal del backlog; si se omite, se usa el genérico del CRUD."""
+    async def _obtener_o_404(self, id_material: str) -> Material:
         material = await self._materiales.obtener_por_id(id_material)
         if material is None:
-            raise RecursoNoEncontradoError(mensaje or formatear(mensajes.MATERIAL_NO_ENCONTRADO, id=id_material))
+            raise RecursoNoEncontradoError(formatear(mensajes.MATERIAL_NO_ENCONTRADO, id=id_material))
         return material
 
 

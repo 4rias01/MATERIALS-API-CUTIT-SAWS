@@ -50,8 +50,8 @@ class MaterialRepository(IMaterialRepository):
         filas = (await self._sesion.execute(consulta)).all()
         return [material for _, material in filas if material is not None], filas[0][0]
 
-    async def obtener_por_id(self, id_material: str) -> Material | None:
-        return await self._sesion.get(Material, id_material)
+    async def obtener_por_id(self, id_material: str, *, para_actualizar: bool = False) -> Material | None:
+        return await self._sesion.get(Material, id_material, with_for_update=para_actualizar)
 
     async def listar(self) -> Sequence[Material]:
         consulta = select(Material).order_by(Material.fecha_registro, Material.id_material)

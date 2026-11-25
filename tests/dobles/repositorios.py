@@ -97,7 +97,7 @@ class MaterialRepositoryFalso(IMaterialRepository):
         encontrados.sort(key=lambda m: (len(m.id_material), m.id_material))
         return encontrados[offset : offset + limite], len(encontrados)
 
-    async def obtener_por_id(self, id_material: str) -> Material | None:
+    async def obtener_por_id(self, id_material: str, *, para_actualizar: bool = False) -> Material | None:
         return self.materiales.get(id_material)
 
     async def listar(self) -> Sequence[Material]:

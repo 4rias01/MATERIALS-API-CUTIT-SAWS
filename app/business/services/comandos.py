@@ -33,17 +33,6 @@ class ActualizarMaterialComando:
 
 
 @dataclass(frozen=True, slots=True)
-class DatosMaterial:
-    """Campos editables de un material (PUT /materiales/{id}, CRUD básico)."""
-
-    nombre: str
-    categoria: str
-    unidad_medida: str
-    densidad: Decimal
-    pureza: Decimal
-
-
-@dataclass(frozen=True, slots=True)
 class RegistrarFormulaComando:
     """HU-05: POST /formulas. Valida también las llamadas ajenas a la API."""
 

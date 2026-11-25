@@ -252,3 +252,20 @@ async def test_inventario_sin_url_configurada() -> None:
     with pytest.raises(ErrorServicioExterno) as error:
         await cliente.registrar_materia_prima("Acero", "kg")
     assert error.value.causa == ErrorServicioExterno.SIN_CONFIGURAR
+
+
+@pytest.mark.parametrize("codigo_http", [200, 204])
+async def test_actualizar_articulo_envia_solo_el_nombre_al_sku_indicado(codigo_http: int) -> None:
+    def confirmar(peticion: httpx.Request) -> httpx.Response:
+        assert peticion.method == "PATCH"
+        assert peticion.url.path == "/inventario/articulos/MP-00007"
+        assert json.loads(peticion.content) == {"nombre": "Acero 1045"}
+        return httpx.Response(codigo_http)
+
+    await _inventario(confirmar).actualizar_articulo("MP-00007", "Acero 1045")
+
+
+async def test_actualizar_articulo_reconoce_rechazo_por_duplicado() -> None:
+    cliente = _inventario(lambda _: httpx.Response(409))
+    with pytest.raises(NombreDuplicadoEnInventarioError):
+        await cliente.actualizar_articulo("MP-00007", "Acero")

@@ -10,7 +10,7 @@ from app.business.domain import mensajes
 from app.business.domain.enums import EstadoMaterial, UnidadMedida
 from app.business.domain.errores import Motivo, ValorInvalidoError
 from app.business.domain.mensajes import formatear
-from app.business.domain.value_objects import a_decimal, normalizar_nombre
+from app.business.domain.value_objects import a_decimal, decimales_significativos, normalizar_nombre
 from app.core.exceptions import ReglaDeNegocioError, SolicitudInvalidaError
 
 
@@ -55,19 +55,8 @@ class Cantidad:
         object.__setattr__(self, "valor", numero)
         if numero <= 0:
             raise ValorInvalidoError("cantidad", Motivo.NO_POSITIVO, numero)
-        if numero >= 1_000_000 or _decimales_significativos(numero) > 3:
+        if numero >= 1_000_000 or decimales_significativos(numero) > 3:
             raise ValorInvalidoError("cantidad", Motivo.DEMASIADOS_DIGITOS, numero)
-
-
-def _decimales_significativos(numero: Decimal) -> int:
-    """Cuenta sin redondear por la precisión del contexto Decimal ni expandir exponentes."""
-    partes = numero.as_tuple()
-    decimales = -int(partes.exponent)
-    for digito in reversed(partes.digits):
-        if digito != 0:
-            break
-        decimales -= 1
-    return max(0, decimales)
 
 
 @dataclass(frozen=True, slots=True)

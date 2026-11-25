@@ -90,11 +90,11 @@ HU05_C9_4 = "El campo 'Unidad de medida' es de solo lectura: el sistema la toma 
 
 # HU-03 · Modificar material -------------------------------------------------------------
 # c2.1 · 400
-HU03_C2_1 = "El campo 'SKU' es de solo lectura y no puede ser modificado."
+HU03_C2_1 = "El campo 'SKU' es de solo lectura y no puede ser modificado"
 # c2.2 · 400
-HU03_C2_2 = "El campo 'Unidad de medida' es de solo lectura y no puede ser modificado."
+HU03_C2_2 = "El campo 'Unidad de medida' es de solo lectura y no puede ser modificado"
 # c2.3 · 400
-HU03_C2_3 = "El campo nombre es obligatorio, por favor, ingrésalo e intenta nuevamente."
+HU03_C2_3 = "El campo nombre es obligatorio, por favor, ingrésalo e intenta nuevamente"
 # c2.4 · 400
 HU03_C2_4_A = "El campo nombre debe tener entre 3 y 100 caracteres"
 # c2.4 · 400
@@ -106,7 +106,7 @@ HU03_C2_6 = "El campo densidad es obligatorio y debe contener un valor numérico
 # c2.7 · 400
 HU03_C2_7 = "El campo pureza es obligatorio y debe estar en una escala de 0 a 100% con máximo 3 caracteres"
 # c2.8 · 400
-HU03_C2_8 = "El campo 'ID' es de solo lectura y no puede ser modificado."
+HU03_C2_8 = "El campo 'ID' es de solo lectura y no puede ser modificado"
 # c3 · 409 · marcadores: [Nombre]
 HU03_C3 = "El material con el nombre '[Nombre]' ya se encuentra registrado en el catálogo"
 # c5 · 409 · marcadores: [Nombre]

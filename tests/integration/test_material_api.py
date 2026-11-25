@@ -161,7 +161,7 @@ async def test_get_con_id_no_valido_responde_404(cliente: httpx.AsyncClient) -> 
 # ── Actualizar ─────────────────────────────────────────────────────────────────
 
 
-async def test_put_actualiza_material_y_responde_200(cliente: httpx.AsyncClient, sesion: AsyncSession) -> None:
+async def test_put_actualiza_material_y_responde_200(cliente: httpx.AsyncClient, sesion: AsyncSession, otra_sesion: AsyncSession) -> None:
     guardado = await guardar(sesion, 1, "Acero")
 
     r = await cliente.put(f"{URL}/{guardado.id_material}", json=cambios("Acero actualizado"))
@@ -170,6 +170,23 @@ async def test_put_actualiza_material_y_responde_200(cliente: httpx.AsyncClient,
     datos = r.json()
     assert (datos["nombre"], datos["sku"], datos["estado"]) == ("Acero actualizado", "MP-00001", "ACTIVO")
     assert datetime.fromisoformat(datos["fechaUltimaActualizacion"]) > datetime.fromisoformat(datos["fechaRegistro"])
+    persistido = await otra_sesion.get(Material, guardado.id_material)
+    assert persistido is not None and persistido.nombre == datos["nombre"]
+    assert persistido.fecha_actualizacion == datetime.fromisoformat(datos["fechaUltimaActualizacion"])
+
+
+async def test_put_rechazado_por_inventario_conserva_el_material(
+    cliente: httpx.AsyncClient, sesion: AsyncSession, otra_sesion: AsyncSession, inventario: InventarioSecuencial
+) -> None:
+    original = await guardar(sesion, 1, "Acero")
+    inventario.nombre_duplicado = True
+    r = await cliente.put(f"{URL}/{original.id_material}", json={**cambios("Cobre"), "categoria": "Componentes", "densidad": 9, "pureza": 100})
+    assert r.status_code == 409
+    persistido = await otra_sesion.get(Material, original.id_material)
+    assert persistido is not None
+    assert (persistido.nombre, persistido.categoria, persistido.densidad, persistido.pureza, persistido.fecha_actualizacion) == (
+        original.nombre, original.categoria, original.densidad, original.pureza, original.fecha_actualizacion
+    )
 
 
 async def test_put_material_inexistente_responde_404(cliente: httpx.AsyncClient) -> None:
