@@ -140,7 +140,7 @@ class MaterialActualizarSolicitud(EsquemaEntrada):
 
     nombre: str = Field(
         description="De 3 a 100 caracteres: letras con o sin tilde, ñ, dígitos, espacios y - . , / ( ) #. "
-        "Se eliminan los espacios al inicio y al final y se reducen a uno los repetidos.",
+        "Se eliminan los espacios al inicio y al final y se reducen a uno (1) los repetidos.",
         examples=["Acero al carbono 1045"],
     )
     categoria: Categoria = Field(examples=["Materia Prima"])
