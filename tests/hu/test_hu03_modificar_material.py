@@ -6,7 +6,7 @@ from httpx import AsyncClient
 
 from app.api import dependencies
 from app.business.domain import mensajes
-from tests.dobles import InventarioClientFalso, MaterialRepositoryFalso, UnitOfWorkFalsa
+from tests.dobles import AuditoriaRepositoryFalso, InventarioClientFalso, MaterialRepositoryFalso, UnitOfWorkFalsa
 from tests.fabricas import un_material
 
 pytestmark = pytest.mark.hu
@@ -44,6 +44,7 @@ def inventario(app: FastAPI) -> InventarioClientFalso:
 def uow(app: FastAPI) -> UnitOfWorkFalsa:
     fake = UnitOfWorkFalsa()
     app.dependency_overrides[dependencies.obtener_unidad_de_trabajo] = lambda: fake
+    app.dependency_overrides[dependencies.obtener_repositorio_auditoria] = AuditoriaRepositoryFalso
     return fake
 
 
@@ -59,42 +60,69 @@ async def test_c01_acepta_los_cuatro_campos_editables(cliente: AsyncClient, cata
 
 
 @pytest.mark.parametrize(
-    "campo, mensaje",
+    "campo, valor, mensaje",
     [
-        ("sku", mensajes.HU03_C2_1),
-        ("unidadMedida", mensajes.HU03_C2_2),
-        ("id", mensajes.HU03_C2_8),
-        ("materialId", mensajes.HU03_C2_8),
+        ("ID", "mat-009", "El campo 'ID' es de solo lectura y no puede ser modificado"),
+        ("ID", None, mensajes.HU03_C2_8),
+        ("SKU", "MP-00009", "El campo 'SKU' es de solo lectura y no puede ser modificado"),
+        ("Unidad de medida", "g", "El campo 'Unidad de medida' es de solo lectura y no puede ser modificado"),
+        ("sku", None, mensajes.HU03_C2_1),
+        ("unidadMedida", None, mensajes.HU03_C2_2),
     ],
 )
-async def test_c02_campos_solo_lectura(cliente: AsyncClient, catalogo, inventario, uow, campo: str, mensaje: str) -> None:
-    r = await cliente.put(URL.format(id_material="mat-001"), json={**CUERPO_OK, campo: "x"})
-    assert r.status_code == 400
-    assert mensaje in r.text
+async def test_c02_campos_solo_lectura(cliente: AsyncClient, catalogo, inventario, uow, campo: str, valor, mensaje: str) -> None:
+    r = await cliente.put(URL.format(id_material="mat-001"), json={**CUERPO_OK, campo: valor})
+    assert (r.status_code, r.json()["mensaje"]) == (400, mensaje)
+    assert inventario.actualizaciones == []
+    assert uow.confirmaciones == 0
+
+
+async def test_c02_id_en_un_cuerpo_sin_otros_campos(cliente: AsyncClient, catalogo, inventario, uow) -> None:
+    r = await cliente.put(URL.format(id_material="mat-001"), json={"ID": "mat-007"})
+    assert (r.status_code, r.json()["mensaje"]) == (400, mensajes.HU03_C2_8)
 
 
 @pytest.mark.parametrize(
     "campo, valor, mensaje",
     [
-        ("nombre", None, mensajes.HU03_C2_3),  # c2.3
+        ("nombre", ..., mensajes.HU03_C2_3),
+        ("nombre", None, mensajes.HU03_C2_3),
+        ("nombre", "   ", mensajes.HU03_C2_3),
+        ("nombre", 123, mensajes.HU03_C2_4_B),
         ("nombre", "ab", mensajes.HU03_C2_4_A),  # c2.4 · longitud
         ("nombre", "Acero @#", mensajes.HU03_C2_4_B),  # c2.4 · caracteres
-        ("categoria", "Metales", "La categoría 'Metales'"),  # c2.5
+        ("nombre", "\tAcero", mensajes.HU03_C2_4_B),
+        ("categoria", "Metales", mensajes.formatear(mensajes.HU03_C2_5, valor="Metales")),
+        ("categoria", ..., mensajes.formatear(mensajes.HU03_C2_5, valor="")),
+        ("categoria", None, mensajes.formatear(mensajes.HU03_C2_5, valor="")),
+        ("densidad", ..., mensajes.HU03_C2_6),
         ("densidad", -1, mensajes.HU03_C2_6),  # c2.6
         ("densidad", None, mensajes.HU03_C2_6),  # c2.6
+        ("densidad", "7.85000000000000000000000000001", mensajes.HU03_C2_6),
+        ("densidad", "1e1000000", mensajes.HU03_C2_6),
+        ("pureza", ..., mensajes.HU03_C2_7),
         ("pureza", 150, mensajes.HU03_C2_7),  # c2.7
         ("pureza", None, mensajes.HU03_C2_7),  # c2.7
     ],
 )
 async def test_c02_validaciones_del_schema(cliente: AsyncClient, catalogo, inventario, uow, campo: str, valor, mensaje: str) -> None:
     cuerpo = {**CUERPO_OK}
-    if valor is None:
+    if valor is ...:
         cuerpo.pop(campo, None)
     else:
         cuerpo[campo] = valor
     r = await cliente.put(URL.format(id_material="mat-001"), json=cuerpo)
-    assert r.status_code == 400
-    assert mensaje in r.text
+    assert (r.status_code, r.json()["mensaje"]) == (400, mensaje)
+    assert inventario.actualizaciones == []
+    assert uow.confirmaciones == 0
+
+
+@pytest.mark.parametrize("campo", ["id", "materialId", "modelId", "id_model", "id_material"])
+async def test_c02_rechaza_variantes_de_ID_como_campos_desconocidos(cliente: AsyncClient, catalogo, inventario, uow, campo: str) -> None:
+    r = await cliente.put(URL.format(id_material="mat-001"), json={**CUERPO_OK, campo: "mat-002"})
+    assert (r.status_code, r.json()["mensaje"]) == (400, mensajes.SOLICITUD_INVALIDA)
+    assert inventario.actualizaciones == []
+    assert uow.confirmaciones == 0
 
 
 # --- c3: nombre duplicado en el catálogo -----------------------------------------
@@ -108,7 +136,7 @@ async def test_c03_nombre_duplicado_responde_409(cliente: AsyncClient, catalogo,
 
 
 async def test_c03_duplicado_ignora_mayusculas(cliente: AsyncClient, catalogo, inventario, uow) -> None:
-    r = await cliente.put(URL.format(id_material="mat-001"), json={**CUERPO_OK, "nombre": "COBRE"})
+    r = await cliente.put(URL.format(id_material="mat-001"), json={**CUERPO_OK, "nombre": "  COBRE  "})
     assert r.status_code == 409
 
 
@@ -116,7 +144,7 @@ async def test_c03_duplicado_ignora_mayusculas(cliente: AsyncClient, catalogo, i
 
 
 async def test_c04_nombre_no_cambia_no_llama_inventario(cliente: AsyncClient, catalogo, inventario, uow) -> None:
-    r = await cliente.put(URL.format(id_material="mat-001"), json={**CUERPO_OK, "nombre": "Material 1"})
+    r = await cliente.put(URL.format(id_material="mat-001"), json={**CUERPO_OK, "nombre": "  Material   1 "})
     assert r.status_code == 200
     assert inventario.actualizaciones == []
 
@@ -135,16 +163,21 @@ async def test_c05_inventario_duplicado_responde_409(cliente: AsyncClient, catal
     r = await cliente.put(URL.format(id_material="mat-001"), json=CUERPO_OK)
     assert r.status_code == 409
     assert r.json()["mensaje"] == mensajes.formatear(mensajes.HU03_C5, Nombre="Acero actualizado")
+    assert catalogo.materiales["mat-001"].nombre == "Material 1"
 
 
 # --- c6: Inventario caído --------------------------------------------------------
 
 
-async def test_c06_inventario_caido_responde_503(cliente: AsyncClient, catalogo, inventario, uow) -> None:
+async def test_c06_inventario_caido_responde_503(cliente: AsyncClient, catalogo, inventario, uow, caplog: pytest.LogCaptureFixture) -> None:
     inventario.caido = True
     r = await cliente.put(URL.format(id_material="mat-001"), json=CUERPO_OK)
     assert r.status_code == 503
-    assert mensajes.HU03_C6 in r.text
+    assert r.json()["mensaje"] == mensajes.HU03_C6
+    assert catalogo.materiales["mat-001"].nombre == "Material 1"
+    traza = r.json()["traceId"]
+    assert traza and traza == r.headers["X-Trace-Id"]
+    assert any(getattr(registro, "trace_id", None) == traza for registro in caplog.records)
 
 
 # --- c7: happy path --------------------------------------------------------------
@@ -158,6 +191,7 @@ async def test_c07_actualiza_y_responde_200(cliente: AsyncClient, catalogo, inve
     assert data["sku"] == "MP-00001"  # readonly, no cambió
     assert data["nombre"] == "Acero actualizado"
     assert data["categoria"] == "Materia Prima"
+    assert (data["densidad"], data["pureza"]) == (8.5, 99)
     assert data["unidadMedida"] == "kg"  # readonly, no cambió
     assert data["estado"] == "ACTIVO"
     assert data["mensaje"] == mensajes.formatear(mensajes.HU03_C7, Nombre="Acero actualizado")
@@ -193,5 +227,9 @@ async def test_c10_bd_falla_responde_500_y_loguea_el_sku(
     uow.fallar_en_commit = True
     r = await cliente.put(URL.format(id_material="mat-001"), json=CUERPO_OK)
     assert r.status_code == 500
-    assert mensajes.HU03_C10 in r.text
+    assert r.json()["mensaje"] == mensajes.HU03_C10
+    traza = r.json()["traceId"]
+    assert traza and traza == r.headers["X-Trace-Id"]
+    assert any(getattr(registro, "trace_id", None) == traza for registro in caplog.records)
+    assert uow.reversiones > 0
     assert "MP-00001" in caplog.text  # SKU en el log para reconciliar con Inventario
